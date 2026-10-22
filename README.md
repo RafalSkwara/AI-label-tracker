@@ -4,7 +4,7 @@ Tracker of the Wydawnictwo project (AI music YouTube channels): tasks, content p
 
 - Next.js 16 (App Router, client-rendered) on Cloudflare Workers via [OpenNext](https://opennext.js.org/cloudflare)
 - Supabase (project `gigsqrnwyeioqlkngfqe`): Postgres + Auth. Every table has RLS; only emails listed in `public.app_owners` can read or write.
-- Login: magic link or the 6-digit code from the same email (the code is what works inside the installed PWA).
+- Login: email + password (works without SMTP and inside the installed PWA); magic link as a fallback. Create the user in Supabase → Authentication → Users → Add user, with Auto Confirm.
 
 ## Develop
 
@@ -18,7 +18,7 @@ npm run preview    # build for Workers and run locally in workerd
 
 ## Deploy
 
-Workers Builds deploys `main`: build command `npx opennextjs-cloudflare build`, deploy command `npx opennextjs-cloudflare deploy`. Manual: `npm run deploy` (needs `wrangler login`).
+`npm run build` produces the Workers bundle (`.open-next/`), so Workers Builds works with its defaults (`npm run build`, then `npx wrangler deploy` / `npx wrangler versions upload`). `npm run build:next` is the plain Next build. Manual deploy: `npm run deploy` (needs `wrangler login`).
 
 ## Data model
 
