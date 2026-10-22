@@ -4,7 +4,7 @@ Tracker of the Wydawnictwo project (AI music YouTube channels): tasks, content p
 
 - Next.js 16 (App Router, client-rendered) on Cloudflare Workers via [OpenNext](https://opennext.js.org/cloudflare)
 - Supabase (project `gigsqrnwyeioqlkngfqe`): Postgres + Auth. Every table has RLS; only emails listed in `public.app_owners` can read or write.
-- Login: magic link or the 6-digit code from the same email (the code is what works inside the installed PWA).
+- Login: email + password (works without SMTP and inside the installed PWA); magic link as a fallback. Create the user in Supabase → Authentication → Users → Add user, with Auto Confirm.
 
 ## Develop
 
