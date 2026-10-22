@@ -18,7 +18,7 @@ npm run preview    # build for Workers and run locally in workerd
 
 ## Deploy
 
-Workers Builds deploys `main`: build command `npx opennextjs-cloudflare build`, deploy command `npx opennextjs-cloudflare deploy`. Manual: `npm run deploy` (needs `wrangler login`).
+`npm run build` produces the Workers bundle (`.open-next/`), so Workers Builds works with its defaults (`npm run build`, then `npx wrangler deploy` / `npx wrangler versions upload`). `npm run build:next` is the plain Next build. Manual deploy: `npm run deploy` (needs `wrangler login`).
 
 ## Data model
 
