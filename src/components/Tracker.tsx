@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { archiveRow, loadAll, saveRow, saveSettings, setTaskDone } from "@/lib/data";
-import { dfmt, inDays, nf, num, pln, today } from "@/lib/format";
+import { daysTo, dfmt, dmy, inDays, nf, num, pln, today } from "@/lib/format";
 import { XP_PER_LEVEL, badges, costTotals, levelName, levelOf, monthly, streak, totalHours, totalSubs, trend, weeksAgg, xpTotal } from "@/lib/game";
 import { supabase } from "@/lib/supabase";
 import type { Coll, Data, Item, Settings, Sub, Task, Week } from "@/lib/types";
@@ -14,6 +14,7 @@ const TABS = [
   { id: "pipeline", name: "Pipeline", coll: "items" },
   { id: "tygodnie", name: "Tygodnie", coll: "weeks" },
   { id: "koszty", name: "Koszty", coll: "subs" },
+  { id: "subskrypcje", name: "Subskrypcje", coll: "subs" },
 ] as const;
 type TabId = (typeof TABS)[number]["id"];
 const NOUN: Record<Coll, string> = { tasks: "zadanie", items: "pozycję", weeks: "tydzień", subs: "subskrypcję" };
@@ -154,6 +155,7 @@ export default function Tracker({ email }: { email: string }) {
             {tab === "tygodnie" && <WeeksPanel data={data} onAdd={() => setEditing({ coll: "weeks", rec: null })} onEdit={(w) => setEditing({ coll: "weeks", rec: w })} />}
             {tab === "koszty" && <CostsPanel data={data} onAdd={() => setEditing({ coll: "subs", rec: null })} onEdit={(s) => setEditing({ coll: "subs", rec: s })}
               onSettings={(k, v) => run(() => saveSettings({ [k]: v }), "Zapisano ustawienia")} />}
+            {tab === "subskrypcje" && <SubsPanel data={data} onAdd={() => setEditing({ coll: "subs", rec: null })} onEdit={(s) => setEditing({ coll: "subs", rec: s })} />}
           </main>
         </>
       )}
@@ -341,3 +343,42 @@ function CostsPanel({ data, onAdd, onEdit, onSettings }: { data: Data; onAdd: ()
   );
 }
 
+
+function SubsPanel({ data, onAdd, onEdit }: { data: Data; onAdd: () => void; onEdit: (s: Sub) => void }) {
+  const st = data.settings, order: Record<string, number> = { aktywna: 0, planowana: 1, anulowana: 2 };
+  const act = data.subs.filter((s) => s.status === "aktywna");
+  const next = act.filter((s) => s.renew && daysTo(s.renew) >= 0).sort((a, b) => a.renew!.localeCompare(b.renew!))[0];
+  const rel = (d: string) => { const n = daysTo(d); return n === 0 ? "dziś" : n > 0 ? `za ${n} ${n === 1 ? "dzień" : "dni"}` : `${-n} ${n === -1 ? "dzień" : "dni"} temu`; };
+  const row = (l: string, v: React.ReactNode) => <><dt className="label">{l}</dt><dd>{v}</dd></>;
+  return (
+    <>
+      <Head title="Subskrypcje" sub="Przegląd usług: od kiedy, do kiedy opłacone, następna płatność i link do panelu" noun={NOUN.subs} onAdd={onAdd} />
+      <div className="totals">
+        <div><div className="label">Aktywne subskrypcje</div><div className="num">{act.length}</div></div>
+        <div><div className="label">Najbliższa płatność</div><div className="num">{next ? `${next.name} · ${dmy(next.renew)}` : "—"}</div></div>
+        <div><div className="label">Koszt aktywnych / mies.</div><div className="num">{pln(costTotals(data).active)}</div></div>
+      </div>
+      {!data.subs.length ? <Empty title="Brak subskrypcji" body="Dodaj pierwszą subskrypcję przyciskiem powyżej." /> : (
+        <div className="subcards">
+          {[...data.subs].sort((a, b) => (order[a.status] ?? 3) - (order[b.status] ?? 3) || (a.renew ?? "9").localeCompare(b.renew ?? "9")).map((s) => (
+            <div key={s.id} className={"card subcard" + (s.status === "anulowana" ? " cancel" : "")} role="button" tabIndex={0}
+              onClick={() => onEdit(s)} onKeyDown={(e) => { if (e.key === "Enter" && e.target === e.currentTarget) onEdit(s); }}>
+              <div className="head">
+                <div style={{ minWidth: 0 }}><div className="t">{s.name}</div><div className="sub">{s.plan ?? "—"}</div></div>
+                <span className={"st " + s.status}>{s.status}</span>
+              </div>
+              <dl>
+                {row("Cena", <>{`${nf(2).format(Number(s.price) || 0)} ${s.currency} / ${s.cycle === "rok" ? "rok" : "mies."}`}<span className="sub"> · {pln(monthly(s, st))} / mies.</span></>)}
+                {row("Od", dmy(s.started_at))}
+                {row("Opłacone do", dmy(s.paid_until))}
+                {row("Następna płatność", s.renew ? <>{dmy(s.renew)} <span className={daysTo(s.renew) < 0 ? "down" : "sub"}>({rel(s.renew)})</span></> : "—")}
+              </dl>
+              {s.plan_details && <p className="details">{s.plan_details}</p>}
+              {s.dashboard_url && /^https?:\/\//.test(s.dashboard_url) && <a href={s.dashboard_url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>Otwórz dashboard</a>}
+            </div>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
