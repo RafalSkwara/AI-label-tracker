@@ -44,6 +44,10 @@ export type Sub = {
   cycle: "mies" | "rok";
   status: "aktywna" | "planowana" | "anulowana";
   renew: string | null;
+  started_at: string | null;
+  paid_until: string | null;
+  plan_details: string | null;
+  dashboard_url: string | null;
   note: string | null;
 };
 

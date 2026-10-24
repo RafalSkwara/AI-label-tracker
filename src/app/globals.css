@@ -142,6 +142,16 @@ tbody tr:last-child td{border-bottom:0}
 @media (max-width:640px){.settings{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .settings p{grid-column:1/-1;margin:0;color:var(--muted);font-size:.82rem}
 
+/* subscriptions overview */
+.subcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));gap:12px}
+.subcard{align-content:start;gap:10px}
+.subcard.cancel{opacity:.6}
+.subcard .head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.subcard .sub{margin:0;font-size:.82rem}
+.subcard dl{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 12px;margin:0;align-items:baseline}
+.subcard dd{margin:0;text-align:right;overflow-wrap:anywhere}
+.subcard .details{margin:0;white-space:pre-line;color:var(--muted);font-size:.85rem;overflow-wrap:anywhere;border-top:1px solid var(--line);padding-top:8px}
+
 /* fields */
 .field{display:grid;gap:4px;min-width:0}
 .field input,.field select,.field textarea{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px}

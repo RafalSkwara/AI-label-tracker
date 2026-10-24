@@ -42,7 +42,11 @@ const FIELDS: Record<Coll, Field[]> = {
     { k: "currency", l: "Waluta", t: "select", o: ["USD", "PLN"] },
     { k: "cycle", l: "Rozliczenie", t: "select", o: ["mies", "rok"] },
     { k: "status", l: "Status", t: "select", o: ["aktywna", "planowana", "anulowana"] },
-    { k: "renew", l: "Odnowienie", t: "date" },
+    { k: "started_at", l: "Od kiedy", t: "date" },
+    { k: "paid_until", l: "Opłacone do", t: "date" },
+    { k: "renew", l: "Następna płatność", t: "date" },
+    { k: "plan_details", l: "Szczegóły planu", t: "textarea", wide: true },
+    { k: "dashboard_url", l: "Link do dashboardu", t: "url", wide: true },
     { k: "note", l: "Notatka", t: "textarea", wide: true },
   ],
 };
