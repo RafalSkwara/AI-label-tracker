@@ -1,6 +1,8 @@
 -- Phase 1 of side-hustle-assistant: channels -> projects, gates, per-video data.
 -- Renames in place (PK, FKs, unique constraints, touch trigger, owner_all policy and v_xp_events survive).
--- Do not apply before the matching code is merged: the app still reads `channels` until then.
+-- Order: JSON backup of all tables -> apply_migration (single transaction, never piecewise) ->
+-- counts (projects = 3, gates = 2) -> merge the PR -> Workers build -> reload on the phone.
+-- Live main reads `channels`, so apply immediately before the merge.
 
 
 -- 1. channels -> projects ---------------------------------------------------
@@ -91,8 +93,8 @@ from w group by project_id, yt_video_id;
 -- 6. RLS --------------------------------------------------------------------
 alter table public.gates enable row level security;
 alter table public.video_daily enable row level security;
-create policy owner_all on public.gates for all to authenticated using (public.is_owner()) with check (public.is_owner());
-create policy owner_all on public.video_daily for all to authenticated using (public.is_owner()) with check (public.is_owner());
+create policy owner_all on public.gates for all to authenticated using ((select public.is_owner())) with check ((select public.is_owner()));
+create policy owner_all on public.video_daily for all to authenticated using ((select public.is_owner())) with check ((select public.is_owner()));
 revoke all on public.gates, public.video_daily, public.v_video_recent from anon;
 grant select, insert, update, delete on public.gates, public.video_daily to authenticated;
 grant select on public.v_video_recent to authenticated;
@@ -101,7 +103,7 @@ grant select on public.v_video_recent to authenticated;
 update public.projects
 set slug = 'slowfall-scenes', name = 'Slowfall Scenes', kind = 'yt_channel', status = 'aktywny',
     yt_channel_id = 'UCrAjgi48bJBW351SaIqi6Yw'
-where id = (select id from public.projects order by created_at limit 1);
+where slug = 'sceny-sezonowe';
 
 insert into public.projects (slug, name, kind, distrokid_artist, status) values
   ('contents-may-vary', 'Contents May Vary', 'both', 'Contents May Vary', 'utrzymanie'),

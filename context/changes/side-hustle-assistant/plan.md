@@ -396,7 +396,7 @@ Rafał's decision (2026-10-26): no unit tests, only the key contact points.
 
 ## Migration Notes
 
-- `channels` is renamed in place (no copy, no drop); apply the phase 1 migration right before merging its PR (a short gap is acceptable for a private app).
+- `channels` is renamed in place (no copy, no drop); apply the phase 1 migration right before merging its PR (a short gap is acceptable for a private app). Fixed order: JSON backup → `apply_migration` (single transaction, never piecewise in the SQL editor) → `select count(*)` checks (projects = 3, gates = 2) → merge → wait for the Workers build → reload on the phone.
 - Backup before migrating: dump all tables as JSON to `/mnt/project-files/backup/` (or the local equivalent).
 - Existing manual `weekly_stats` fields (`uploads`, `revenue_pln`, `note`) are never overwritten by the sync.
 

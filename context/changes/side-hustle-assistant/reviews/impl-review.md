@@ -46,7 +46,7 @@ Reviewed `git diff main...HEAD` (commits `68e5b67`, `b4c650a`, `c16a8a9`) agains
   - Confidence: HIGH — both failure modes follow directly from the table names in `src/lib/data.ts:13-24`.
   - Blind spot: Actual Workers Builds duration not measured.
 - **Must fix before apply**: yes (procedure and header comment, not schema).
-- **Decision**: PENDING
+- **Decision**: Accepted — fixed in SHA
 
 ### F2 — New `owner_all` policies call `is_owner()` per row instead of `(select is_owner())`
 
@@ -57,7 +57,7 @@ Reviewed `git diff main...HEAD` (commits `68e5b67`, `b4c650a`, `c16a8a9`) agains
 - **Detail**: Every live `owner_all` policy is `using ((select is_owner()))` / `with check ((select is_owner()))` (initPlan, evaluated once per statement). The new policies use bare `public.is_owner()`, a `security definer` function that queries `app_owners` with `auth.jwt()`, so it runs once per row. Harmless for `gates`, but `video_daily` grows by one row per video per day and is read through `v_video_recent` on every load; Supabase's performance advisor flags this pattern (`auth_rls_initplan`). Fixing it later needs a second migration.
 - **Fix**: Use `using ((select public.is_owner())) with check ((select public.is_owner()))` on both policies.
 - **Must fix before apply**: recommended (one-line change now vs. a follow-up migration later).
-- **Decision**: PENDING
+- **Decision**: Accepted — fixed in SHA
 
 ### F3 — Slowfall row picked by `order by created_at limit 1`, not by explicit slug
 
@@ -68,7 +68,7 @@ Reviewed `git diff main...HEAD` (commits `68e5b67`, `b4c650a`, `c16a8a9`) agains
 - **Detail**: Review decision F1 says "explicit slugs". The update targets "the oldest row" instead of `slug = 'sceny-sezonowe'`. It works on live today (exactly one row, verified), but it is the one statement in the data section whose target is implicit; on any other database (a branch, a restore with extra rows) it would silently rename the wrong project and the gates would attach to it.
 - **Fix**: `where slug = 'sceny-sezonowe'` (the live slug).
 - **Must fix before apply**: recommended.
-- **Decision**: PENDING
+- **Decision**: Accepted — fixed in SHA
 
 ### F4 — Pre-apply checklist items are not in the repo
 
@@ -78,7 +78,7 @@ Reviewed `git diff main...HEAD` (commits `68e5b67`, `b4c650a`, `c16a8a9`) agains
 - **Location**: context/changes/side-hustle-assistant/plan.md:397-401
 - **Detail**: The migration is not idempotent, which is fine (a re-run fails harmlessly at line 7), but its atomicity relies on `apply_migration` running the file as one transaction. If it is ever run another way (e.g. statement by statement in the SQL editor) and fails mid-way, it leaves a half-renamed schema. The JSON backup is still a manual step.
 - **Fix**: Apply only via `apply_migration` (single transaction), after the JSON backup; do not paste it into the SQL editor in pieces.
-- **Decision**: PENDING
+- **Decision**: Accepted — no change
 
 ### F5 — `v_video_recent.weeks` includes partial weeks at both ends
 
@@ -88,7 +88,7 @@ Reviewed `git diff main...HEAD` (commits `68e5b67`, `b4c650a`, `c16a8a9`) agains
 - **Location**: supabase/migrations/20261026120000_projects.sql:73
 - **Detail**: `date >= current_date - 35` is a rolling 36-day window, so the oldest week in `weeks` is usually cut and the newest is incomplete (plus the ~2-day report lag). This matches the decision row, but Phase 2 rules (`impressions_wow_rising`, the impressions-drop alert) must apply the plan's "complete week" definition themselves, otherwise a partial week reads as a drop.
 - **Fix**: In Phase 2, filter `weeks` to complete weeks (Sunday ≥ 3 days before today) before any week-over-week comparison; no schema change.
-- **Decision**: PENDING
+- **Decision**: Deferred to Phase 2 (complete-week filter)
 
 ### F6 — `i01` already has its video id on live
 
@@ -98,7 +98,7 @@ Reviewed `git diff main...HEAD` (commits `68e5b67`, `b4c650a`, `c16a8a9`) agains
 - **Location**: supabase/migrations/20261026120000_projects.sql:111
 - **Detail**: Live `i01.yt_video_id` is already `yL4czbAFQ54` (the plan's Current State says `yt_video_id` is empty). The update is a harmless no-op; `i03` is the only real change.
 - **Fix**: None needed.
-- **Decision**: PENDING
+- **Decision**: Accepted — no change
 
 ### F7 — Success criteria: 1.1 and manual checks still open; automated checks not re-run here
 
@@ -108,7 +108,7 @@ Reviewed `git diff main...HEAD` (commits `68e5b67`, `b4c650a`, `c16a8a9`) agains
 - **Location**: context/changes/side-hustle-assistant/plan.md:442-450
 - **Detail**: 1.2–1.4 are marked `[x]` against `b4c650a`; they were not re-run in this review (the review worktree has no `node_modules`; the code here is identical to that commit). 1.1 is correctly left open until the migration is applied. Manual 1.5 (tabs, XP, badges on the phone) and 1.6 (project picker and chip) are pending and can only be checked after apply + deploy. Expect XP to be unchanged: `v_xp_events` week refs change only in name, and `weekly_stats` has 0 rows.
 - **Fix**: After apply, run the 1.1 counts and tick 1.1; then do 1.5/1.6 on the phone.
-- **Decision**: PENDING
+- **Decision**: Accepted — no change
 
 ## Before the migration is applied
 
