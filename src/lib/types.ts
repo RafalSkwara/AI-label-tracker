@@ -6,11 +6,12 @@ export type Task = {
   note: string | null;
   done: boolean;
   done_at: string | null;
+  project_id: string | null;
 };
 
 export type Item = {
   id: string;
-  channel_id: string | null;
+  project_id: string | null;
   title: string;
   kind: "film" | "EP" | "short";
   status: "pomysł" | "produkcja" | "zaplanowany" | "live";
@@ -22,12 +23,13 @@ export type Item = {
 };
 
 export type Week = {
-  channel_id: string;
+  project_id: string;
   week_start: string;
   uploads: number | null;
   views: number | null;
   watch_hours: number | null;
   subs_net: number | null;
+  impressions: number | null;
   ctr_pct: number | null;
   avd_min: number | null;
   revenue_pln: number | null;
@@ -49,9 +51,38 @@ export type Sub = {
   plan_details: string | null;
   dashboard_url: string | null;
   note: string | null;
+  project_id: string | null;
 };
 
-export type Channel = { id: string; name: string; niche: string | null };
+export type Project = {
+  id: string;
+  slug: string;
+  name: string;
+  niche: string | null;
+  kind: "yt_channel" | "artist" | "both";
+  status: "aktywny" | "utrzymanie" | "planowany" | "zamknięty";
+  yt_channel_id: string | null;
+  distrokid_artist: string | null;
+};
+
+export type GateRule =
+  | { rule: "ctr_last3_weighted"; min_pct: number }
+  | { rule: "impressions_wow_rising" }
+  | { rule: "watch_hours_month_vs"; month: string; vs: string };
+
+export type Gate = { id: string; project_id: string; title: string; due: string; rules: GateRule[]; note: string | null };
+
+/** One row of v_video_recent: the last 35 days of a video, summed, plus per-week totals */
+export type VideoRecent = {
+  project_id: string;
+  yt_video_id: string;
+  views: number | null;
+  watch_minutes: number | null;
+  subs_net: number | null;
+  impressions: number | null;
+  clicks: number | null;
+  weeks: { week_start: string; views: number; watch_minutes: number; subs_net: number; impressions: number; clicks: number }[];
+};
 
 export type Settings = { budget_min: number; budget_max: number; usd_pln: number; vat_pct: number };
 
@@ -62,7 +93,9 @@ export type Data = {
   items: Item[];
   weeks: Week[];
   subs: Sub[];
-  channels: Channel[];
+  projects: Project[];
+  gates: Gate[];
+  videos: VideoRecent[];
   settings: Settings;
   xp: XpEvent[];
 };
