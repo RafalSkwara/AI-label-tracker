@@ -102,7 +102,7 @@
 - **Location**: src/lib/rules.ts:182, src/lib/rules.ts:32, src/components/Today.tsx:7-8
 - **Detail**: `ctr_low` says "przy 1 234 wyświetleń" — wrong case after "przy" and ambiguous with views ("wyświetlenia" is also Studio's word for views); the gate rule label correctly says "Wyświetlenia miniatur". The `med` badge "Wkrótce" fits due tasks and renewals but not a CTR or impressions drop. `when()` in rules says "jutro" while the gate card's `days()` says "za 1 dzień", and the two helpers duplicate day phrasing. All other strings are Polish and consistent with existing UI ("Następna płatność", "t/t", "brak danych").
 - **Fix**: "przy N wyświetleniach miniatur"; rename the `med` badge to e.g. "Ważne"; use one day-phrase helper for both files.
-- **Decision**: wording and shared `when()` fixed in ef99fc6; `med` badge rename pending Rafał
+- **Decision**: wording and shared `when()` fixed in ef99fc6; badge: Accepted — Rafał chose „Ważne” 2026-10-26
 
 ### F7 — Block elements inside a `<button>`
 

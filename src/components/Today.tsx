@@ -4,7 +4,7 @@ import { dmy } from "@/lib/format";
 import { type Alert, gateRules, gateStatus, when } from "@/lib/rules";
 import type { Data } from "@/lib/types";
 
-const SEV = { high: "Pilne", med: "Wkrótce", low: "Info" } as const;
+const SEV = { high: "Pilne", med: "Ważne", low: "Info" } as const;
 
 /** Alerts that open a record are tappable; the rest are informational */
 export const opensRecord = (a: Alert) => a.kind !== "gate" && a.kind !== "sync_failed";
