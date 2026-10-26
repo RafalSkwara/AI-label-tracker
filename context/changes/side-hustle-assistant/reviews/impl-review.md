@@ -46,7 +46,7 @@ Reviewed `git diff main...HEAD` (commits `68e5b67`, `b4c650a`, `c16a8a9`) agains
   - Confidence: HIGH — both failure modes follow directly from the table names in `src/lib/data.ts:13-24`.
   - Blind spot: Actual Workers Builds duration not measured.
 - **Must fix before apply**: yes (procedure and header comment, not schema).
-- **Decision**: Accepted — fixed in SHA
+- **Decision**: Accepted — fixed in 6c08dcf
 
 ### F2 — New `owner_all` policies call `is_owner()` per row instead of `(select is_owner())`
 
@@ -57,7 +57,7 @@ Reviewed `git diff main...HEAD` (commits `68e5b67`, `b4c650a`, `c16a8a9`) agains
 - **Detail**: Every live `owner_all` policy is `using ((select is_owner()))` / `with check ((select is_owner()))` (initPlan, evaluated once per statement). The new policies use bare `public.is_owner()`, a `security definer` function that queries `app_owners` with `auth.jwt()`, so it runs once per row. Harmless for `gates`, but `video_daily` grows by one row per video per day and is read through `v_video_recent` on every load; Supabase's performance advisor flags this pattern (`auth_rls_initplan`). Fixing it later needs a second migration.
 - **Fix**: Use `using ((select public.is_owner())) with check ((select public.is_owner()))` on both policies.
 - **Must fix before apply**: recommended (one-line change now vs. a follow-up migration later).
-- **Decision**: Accepted — fixed in SHA
+- **Decision**: Accepted — fixed in 6c08dcf
 
 ### F3 — Slowfall row picked by `order by created_at limit 1`, not by explicit slug
 
@@ -68,7 +68,7 @@ Reviewed `git diff main...HEAD` (commits `68e5b67`, `b4c650a`, `c16a8a9`) agains
 - **Detail**: Review decision F1 says "explicit slugs". The update targets "the oldest row" instead of `slug = 'sceny-sezonowe'`. It works on live today (exactly one row, verified), but it is the one statement in the data section whose target is implicit; on any other database (a branch, a restore with extra rows) it would silently rename the wrong project and the gates would attach to it.
 - **Fix**: `where slug = 'sceny-sezonowe'` (the live slug).
 - **Must fix before apply**: recommended.
-- **Decision**: Accepted — fixed in SHA
+- **Decision**: Accepted — fixed in 6c08dcf
 
 ### F4 — Pre-apply checklist items are not in the repo
 
