@@ -432,6 +432,15 @@ Delegated to the agent per Rafał's working rules (non-UI decisions are the agen
 | Phase 1 task→project mapping | Elektronika: t07, t25, t26. Slowfall: t03, t08–t11, t15, t16, t18–t24. Shared (null): t01, t02, t04–t06, t13, t14, t17 (account, tooling, legal) |
 | Phase 1 Sheet | `Channel` picker field renamed `project` ("Projekt"); added to tasks and subs forms as optional; project chip on task rows, cost rows and subscription cards |
 | Phase 1 zero downtime | Split into expand (compat view `channels`, `project_id` beside `channel_id`, sync triggers, unique index on `weekly_stats (project_id, week_start)`) and contract (cleanup migration, applied only after the deploy is verified); the sync trigger lets the changed column win, `project_id` when both changed. New code uses only `projects`/`project_id` and works in both schema states |
+| Phase 2 week data | Rules read per-project weekly totals from `weekly_stats` first (manual or synced) and fill the weeks it lacks from `v_video_recent.weeks`; this is what makes gate cards show a value after a manual week, before Phase 3 |
+| Phase 2 complete weeks (F5) | `completeWeeks(today, n)` = Mondays whose Sunday ≤ today − 3. `v_video_recent` weeks older than today − 35 days are cut by the view and ignored. All week-over-week and 28-day (= last 4 complete weeks) computations use only these |
+| Phase 2 `ctr_last3_weighted` | Per-video Σclicks/Σimpressions over the last 4 complete weeks for the 3 newest live films with a `yt_video_id` and ≥ 100 impressions (fewer than 3 qualifying films are used as they are, label says how many); with no per-video data falls back to channel-level `weekly_stats` (Σ impressions × ctr / Σ impressions, needs ≥ 100). `ok = value ≥ min_pct` |
+| Phase 2 `impressions_wow_rising` | Last complete week vs the one before; `ok = change > 0`; no data if either week is missing or the earlier one is 0 |
+| Phase 2 `watch_hours_month_vs` | Weekly hours spread evenly over the 7 days of each week, summed over days 1..N of both months (N = days up to the last complete day of the target month, capped by the length of the `vs` month). No data if any day in either range lacks a week. `ok = target month > vs month` (strictly) |
+| Phase 2 multi-rule gates | `gateStatus.ok` = false if any rule fails, true if all pass, else null; `value`/`target` come from the first rule; `label` joins the rule labels; extra export `gateRules` gives per-rule rows for the card |
+| Phase 2 `sync_failed` | `Data.integrations` is not typed yet; `alerts` reads it through a local cast and produces nothing when absent. Staleness uses a clock (`alerts(d, today, nowMs = Date.now())`) because "36 h" cannot be derived from a date string. Phase 3 should type `Data.integrations` and drop the cast |
+| Phase 2 alert edges | Renewal alert only for `0..7` days ahead (overdue renewals are not alerted); `ctr_low` is per video from `v_video_recent` (last complete week, ≥ 100 impressions); `gate` alert also fires after the due date while `ok=false`; `Item` type gained `yt_video_id` (column already exists) |
+| Phase 2 tabs | Start tab = `?tab=` → `sessionStorage` (reloads in a session) → `dzis`; the old `localStorage` key is no longer read. Dziś tab count = high + med alerts. Tapping an alert opens the task / subscription / film in the edit sheet; gate and sync alerts are not tappable |
 | F10 small fixes | All applied; synced weeks keep earning XP; t23/t24 kept, alerts suppressed |
 
 ## Progress
@@ -449,17 +458,17 @@ Delegated to the agent per Rafał's working rules (non-UI decisions are the agen
 
 #### Manual
 
-- [ ] 1.5 Existing tabs, XP and badges work on the phone
-- [ ] 1.6 Project picker in the task form and chip on the list
-- [ ] 1.7 Cleanup (contract) migration applied after the deploy is verified, app still works on the phone
+- [x] 1.5 Existing tabs, XP and badges work on the phone — confirmed by Rafał on the phone 2026-10-26
+- [x] 1.6 Project picker in the task form and chip on the list — confirmed by Rafał on the phone 2026-10-26
+- [x] 1.7 Cleanup (contract) migration applied after the deploy is verified, app still works on the phone — contract applied 2026-10-26: no channel_id, weekly_stats PK (project_id, week_start), v_xp_events = 12
 
 ### Phase 2: Dziś screen and alert rules
 
 #### Automated
 
-- [ ] 2.1 Type checking passes
-- [ ] 2.2 Linting passes
-- [ ] 2.3 OpenNext build passes
+- [x] 2.1 Type checking passes
+- [x] 2.2 Linting passes
+- [x] 2.3 OpenNext build passes
 
 #### Manual
 

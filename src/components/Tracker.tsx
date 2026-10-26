@@ -6,10 +6,13 @@ import { daysTo, dfmt, dmy, inDays, nf, num, pln, today } from "@/lib/format";
 import { XP_PER_LEVEL, badges, costTotals, levelName, levelOf, monthly, streak, totalHours, totalSubs, trend, weeksAgg, xpTotal } from "@/lib/game";
 import { supabase } from "@/lib/supabase";
 import type { Coll, Data, Item, Settings, Sub, Task, Week } from "@/lib/types";
+import { type Alert, alerts } from "@/lib/rules";
 import Sheet from "./Sheet";
+import Today from "./Today";
 import WeeksChart from "./WeeksChart";
 
 const TABS = [
+  { id: "dzis", name: "Dziś", coll: null },
   { id: "zadania", name: "Zadania", coll: "tasks" },
   { id: "pipeline", name: "Pipeline", coll: "items" },
   { id: "tygodnie", name: "Tygodnie", coll: "weeks" },
@@ -24,10 +27,13 @@ export default function Tracker({ email }: { email: string }) {
   const [data, setData] = useState<Data | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(true);
-  // Tracker mounts only on the client (after the session check), so localStorage is safe here
+  // Tracker mounts only on the client (after the session check), so window and sessionStorage are safe here.
+  // Start tab: ?tab= from the URL, else the tab remembered for this session (reloads), else Dziś on every launch.
   const [tab, setTab] = useState<TabId>(() => {
-    try { const s = localStorage.getItem("tab"); if (TABS.some((t) => t.id === s)) return s as TabId; } catch {}
-    return "zadania";
+    const ok = (s: string | null) => TABS.some((t) => t.id === s);
+    try { const q = new URLSearchParams(window.location.search).get("tab"); if (ok(q)) return q as TabId; } catch {}
+    try { const s = sessionStorage.getItem("tab"); if (ok(s)) return s as TabId; } catch {}
+    return "dzis";
   });
   const [editing, setEditing] = useState<Editing>(null);
   const [toast, setToast] = useState<{ msg: string; xp?: boolean } | null>(null);
@@ -73,7 +79,16 @@ export default function Tracker({ email }: { email: string }) {
 
   function pickTab(id: TabId) {
     setTab(id);
-    try { localStorage.setItem("tab", id); } catch {}
+    try { sessionStorage.setItem("tab", id); } catch {}
+  }
+
+  function openAlert(a: Alert) {
+    if (!data) return;
+    const find = <T extends { id: string }>(l: T[]) => l.find((x) => x.id === a.ref);
+    if (a.kind === "task_late" || a.kind === "task_soon") { const t = find(data.tasks); if (t) setEditing({ coll: "tasks", rec: t }); else pickTab("zadania"); }
+    else if (a.kind === "renewal") { const s = find(data.subs); if (s) setEditing({ coll: "subs", rec: s }); else pickTab("subskrypcje"); }
+    else if (a.kind === "ctr_low") { const i = find(data.items); if (i) setEditing({ coll: "items", rec: i }); else pickTab("tygodnie"); }
+    else if (a.kind === "impressions_drop") pickTab("tygodnie");
   }
 
   const xp = data ? xpTotal(data) : 0, lvl = levelOf(xp), into = xp - lvl * XP_PER_LEVEL;
@@ -140,12 +155,13 @@ export default function Tracker({ email }: { email: string }) {
             {TABS.map((t) => (
               <button key={t.id} role="tab" id={"tab-" + t.id} aria-selected={tab === t.id} onClick={() => pickTab(t.id)}>
                 {t.name}
-                <span className="count">{t.coll === "tasks" ? data.tasks.filter((x) => !x.done).length : data[t.coll].length}</span>
+                <span className="count">{t.coll === null ? alerts(data, today()).filter((a) => a.severity !== "low").length : t.coll === "tasks" ? data.tasks.filter((x) => !x.done).length : data[t.coll].length}</span>
               </button>
             ))}
           </nav>
 
           <main className="panel" role="tabpanel" aria-labelledby={"tab-" + tab}>
+            {tab === "dzis" && <Today data={data} today={today()} onOpen={openAlert} />}
             {tab === "zadania" && <TasksPanel data={data} onAdd={() => setEditing({ coll: "tasks", rec: null })} onEdit={(t) => setEditing({ coll: "tasks", rec: t })}
               onToggle={(t, done) => {
                 setData({ ...data, tasks: data.tasks.map((x) => (x.id === t.id ? { ...x, done } : x)) });
