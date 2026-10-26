@@ -494,7 +494,7 @@ Delegated to the agent per Rafał's working rules (non-UI decisions are the agen
 
 #### Automated
 
-- [x] 3.1 Integrations migration, token unreadable for authenticated — c5e0618 — written, not applied (orchestrator applies)
+- [x] 3.1 Integrations migration, token unreadable for authenticated — c5e0618 — applied 2026-10-26 by orchestrator; authenticated/anon have no select on integrations
 - [x] 3.2 YouTube mapping integration test passes — c5e0618
 - [x] 3.3 Type checking passes — c5e0618
 - [x] 3.4 Linting passes — c5e0618
