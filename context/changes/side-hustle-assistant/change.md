@@ -1,7 +1,7 @@
 ---
 change_id: side-hustle-assistant
 title: Tracker → Side Hustle Assistant (assistant and dashboard)
-status: planned
+status: plan_reviewed
 created: 2026-10-26
 updated: 2026-10-26
 archived_at: null
