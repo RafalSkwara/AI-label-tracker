@@ -3,6 +3,15 @@
 -- must already be applied). Removes the compat layer: no data is lost, `projects` is kept.
 -- Apply with apply_migration (single transaction), then check the app on the phone again.
 
+-- Guard: refuse to drop channel_id while the two columns disagree anywhere
+do $$
+begin
+  if exists (select 1 from public.content_items where channel_id is distinct from project_id)
+     or exists (select 1 from public.weekly_stats where channel_id is distinct from project_id) then
+    raise exception 'channel_id and project_id differ; reload all clients and resolve before applying cleanup';
+  end if;
+end $$;
+
 -- Compat view and sync triggers
 drop view public.channels;
 drop trigger sync_project_channel on public.content_items;

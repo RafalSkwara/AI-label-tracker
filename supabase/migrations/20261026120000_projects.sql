@@ -38,7 +38,7 @@ create unique index weekly_stats_project_week_key on public.weekly_stats (projec
 
 -- Keeps channel_id and project_id equal: a null side takes the other; on update the changed side wins
 -- (project_id when both changed); on insert with both set, project_id wins.
-create function public.sync_project_channel() returns trigger language plpgsql as $$
+create function public.sync_project_channel() returns trigger language plpgsql set search_path = '' as $$
 begin
   if tg_op = 'INSERT' then
     if new.project_id is not null then new.channel_id := new.project_id;
