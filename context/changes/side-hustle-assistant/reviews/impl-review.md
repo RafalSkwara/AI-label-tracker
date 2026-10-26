@@ -157,7 +157,7 @@ Checked against `git show origin/main:src/lib/data.ts` / `src/components/Sheet.t
 - **Detail**: The drop is lossless only if the triggers kept both columns equal on every row. Triggers can be bypassed (e.g. `session_replication_role = replica`, or a manual fix in the SQL editor), and `set not null` at `:29` would only catch `weekly_stats` rows with a null `project_id`, not rows where the two columns differ.
 - **Fix**: Before applying CONTRACT, run read-only checks and proceed only if both return 0: `select count(*) from content_items where channel_id is distinct from project_id`, and the same for `weekly_stats`. Alternatively, put the same check at the top of the file as a `do $$ … raise exception … $$` guard.
 - **Must fix**: before CONTRACT (not before EXPAND).
-- **Decision**: PENDING
+- **Decision**: Accepted — fixed in 2cca551
 
 ### R2 — `sync_project_channel()` has no fixed `search_path`
 
@@ -167,7 +167,7 @@ Checked against `git show origin/main:src/lib/data.ts` / `src/components/Sheet.t
 - **Location**: supabase/migrations/20261026120000_projects.sql:41
 - **Detail**: Supabase's security advisor flags functions without `set search_path` (`function_search_path_mutable`). The body references no objects, so there is no real risk, and CONTRACT drops the function.
 - **Fix**: Optional: add `set search_path = ''`, or ignore it, since the function only exists until CONTRACT.
-- **Decision**: PENDING
+- **Decision**: Accepted — fixed in 2cca551
 
 ### R3 — EXPAND backfill bumps `updated_at` on existing rows
 
@@ -177,7 +177,7 @@ Checked against `git show origin/main:src/lib/data.ts` / `src/components/Sheet.t
 - **Location**: supabase/migrations/20261026120000_projects.sql:34, 140-141, 154-159
 - **Detail**: The `touch` trigger fires on the backfill and on the data updates, so all 3 `content_items` and the 17 mapped `tasks` get `updated_at = now()`. Round 1 did the same for tasks and did not flag it. XP is unaffected: on live there are 0 done tasks without `done_at` and 0 live items without `live_at`, and `src/lib/game.ts:51` uses `updated_at` only after `publish_date`/`live_at`. The only loss is the "last modified" time.
 - **Fix**: None needed; accept.
-- **Decision**: PENDING
+- **Decision**: Accepted — no change
 
 ### R4 — EXPAND still contains the word "delete"
 
@@ -187,7 +187,7 @@ Checked against `git show origin/main:src/lib/data.ts` / `src/components/Sheet.t
 - **Location**: supabase/migrations/20261026120000_projects.sql:29, 32, 33, 58, 59, 66, 82, 127
 - **Detail**: Every occurrence is a privilege (`grant … delete`) or an FK action (`on delete set null|cascade`), not data removal. If a guard on `apply_migration` enforces the "no `delete` in SQL" rule, the apply will be refused. The cleanup file is clean.
 - **Fix**: Confirm the guard does not cover `apply_migration`, or have Rafał approve that apply explicitly.
-- **Decision**: PENDING
+- **Decision**: Accepted — the rule covers execute_sql only; apply via apply_migration
 
 ### R5 — Old bundles break after CONTRACT
 
@@ -197,7 +197,7 @@ Checked against `git show origin/main:src/lib/data.ts` / `src/components/Sheet.t
 - **Location**: supabase/migrations/20261026130000_projects_cleanup.sql:7
 - **Detail**: Any tab or installed PWA still running the `main` bundle loses `channels` when CONTRACT runs. The plan's phone check after deploy covers this only if every client was reloaded.
 - **Fix**: Reload the phone PWA (and close desktop tabs) on the new build before CONTRACT.
-- **Decision**: PENDING
+- **Decision**: Accepted — reload all clients before CONTRACT (in Migration Notes)
 
 ### Dry run
 
