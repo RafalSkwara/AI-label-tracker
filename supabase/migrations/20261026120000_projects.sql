@@ -1,9 +1,13 @@
--- Phase 1 of side-hustle-assistant: channels -> projects, gates, per-video data.
--- Renames in place (PK, FKs, unique constraints, touch trigger, owner_all policy and v_xp_events survive).
+-- Phase 1 of side-hustle-assistant, EXPAND step: apply BEFORE merging the PR.
+-- channels -> projects in place (PK, FKs, unique constraints, touch trigger, owner_all policy and
+-- v_xp_events survive), plus gates, video_daily and v_video_recent.
+-- Zero downtime: the live code keeps working through the compat view `channels` and the old
+-- `channel_id` columns, which stay in place next to the new `project_id` ones and are kept in
+-- sync by triggers. Both disappear in 20261026130000_projects_cleanup.sql (apply after the deploy
+-- is verified on the phone).
 -- Order: JSON backup of all tables -> apply_migration (single transaction, never piecewise) ->
--- counts (projects = 3, gates = 2) -> merge the PR -> Workers build -> reload on the phone.
--- Live main reads `channels`, so apply immediately before the merge.
-
+-- counts (projects = 3, gates = 2) -> old app still works -> merge -> Workers build -> phone check ->
+-- cleanup migration -> phone check.
 
 -- 1. channels -> projects ---------------------------------------------------
 alter table public.channels rename to projects;
@@ -18,12 +22,36 @@ alter table public.projects
   add column note text null,
   add column archived_at timestamptz null;
 
--- 2. channel_id -> project_id ---------------------------------------------
-alter table public.content_items rename column channel_id to project_id;
-alter table public.weekly_stats rename column channel_id to project_id;
-alter table public.content_items rename constraint content_items_channel_id_fkey to content_items_project_id_fkey;
-alter table public.weekly_stats rename constraint weekly_stats_channel_id_fkey to weekly_stats_project_id_fkey;
-alter index public.content_items_channel_id_idx rename to content_items_project_id_idx;
+-- Compat view: the old name and exact old columns, auto-updatable (single table, no expressions)
+create view public.channels with (security_invoker = true) as
+  select id, slug, name, niche, yt_channel_id, created_at, updated_at from public.projects;
+revoke all on public.channels from anon;
+grant select, insert, update, delete on public.channels to authenticated;
+
+-- 2. project_id next to channel_id --------------------------------------------
+alter table public.content_items add column project_id uuid null references public.projects (id) on delete set null;
+alter table public.weekly_stats add column project_id uuid null references public.projects (id) on delete cascade;
+update public.content_items set project_id = channel_id;
+update public.weekly_stats set project_id = channel_id;
+create index content_items_project_id_idx on public.content_items (project_id);
+create unique index weekly_stats_project_week_key on public.weekly_stats (project_id, week_start);
+
+-- Keeps channel_id and project_id equal: a null side takes the other; on update the changed side wins
+-- (project_id when both changed); on insert with both set, project_id wins.
+create function public.sync_project_channel() returns trigger language plpgsql as $$
+begin
+  if tg_op = 'INSERT' then
+    if new.project_id is not null then new.channel_id := new.project_id;
+    else new.project_id := new.channel_id; end if;
+  elsif new.project_id is distinct from old.project_id then new.channel_id := new.project_id;
+  elsif new.channel_id is distinct from old.channel_id then new.project_id := new.channel_id;
+  end if;
+  return new;
+end $$;
+create trigger sync_project_channel before insert or update on public.content_items
+  for each row execute function public.sync_project_channel();
+create trigger sync_project_channel before insert or update on public.weekly_stats
+  for each row execute function public.sync_project_channel();
 
 alter table public.weekly_stats add column impressions int null;
 
