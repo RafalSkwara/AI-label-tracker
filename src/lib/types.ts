@@ -73,7 +73,7 @@ export type GateRule =
 
 export type Gate = { id: string; project_id: string; title: string; due: string; rules: GateRule[]; note: string | null };
 
-/** One row of v_video_recent: the last 35 days of a video, summed, plus per-week totals */
+/** One row of v_video_recent: the last 42 days of a video, summed, plus per-week totals */
 export type VideoRecent = {
   project_id: string;
   yt_video_id: string;
@@ -83,6 +83,17 @@ export type VideoRecent = {
   impressions: number | null;
   clicks: number | null;
   weeks: { week_start: string; views: number; watch_minutes: number; subs_net: number; impressions: number; clicks: number }[];
+};
+
+/** integration_status(): everything except the refresh token */
+export type Integration = {
+  project_id: string;
+  provider: "youtube";
+  yt_channel_id: string | null;
+  reporting_job_id: string | null;
+  reports_cursor: string | null;
+  last_sync_at: string | null;
+  last_error: string | null;
 };
 
 export type Settings = { budget_min: number; budget_max: number; usd_pln: number; vat_pct: number };
@@ -97,6 +108,7 @@ export type Data = {
   projects: Project[];
   gates: Gate[];
   videos: VideoRecent[];
+  integrations: Integration[];
   settings: Settings;
   xp: XpEvent[];
 };

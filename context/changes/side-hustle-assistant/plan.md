@@ -238,6 +238,8 @@ Connect channels through OAuth and run a daily cron that stores per-video and pe
 
 New name in the app, the PWA and the infrastructure; the old URL redirects. Done before push so push subscriptions live on the final origin.
 
+**Constraint from Phase 3:** the worker `scheduled` handler calls itself through `openNext.fetch` on the fake host `cron.internal`. The old-host redirect (redirect-worker) is a separate worker, so it is unaffected, but no redirect rule inside the main worker may catch `cron.internal`, or the cron would get a 301.
+
 ### Changes Required:
 
 #### 1. Name in the app
@@ -442,6 +444,16 @@ Delegated to the agent per Rafał's working rules (non-UI decisions are the agen
 | Phase 2 alert edges | Renewal alert only for `0..7` days ahead (overdue renewals are not alerted); `ctr_low` is per video from `v_video_recent` (last complete week, ≥ 100 impressions); `gate` alert also fires after the due date while `ok=false`; `Item` type gained `yt_video_id` (column already exists) |
 | Phase 2 tabs | Start tab = `?tab=` → `sessionStorage` (reloads in a session) → `dzis`; the old `localStorage` key is no longer read. Dziś tab count = high + med alerts. Tapping an alert opens the task / subscription / film in the edit sheet; gate and sync alerts are not tappable |
 | Phase 2 review F1–F8 | F1: the month comparison ends at the Sunday of the last complete week. F2 (Fix A): a `weekly_stats` row with `source = 'manual'` is complete once its Sunday is before today; `yt_api` rows and `v_video_recent` keep the 3-day lag. F3: `?tab=` is removed from the URL after reading (other params kept). F4: `videoWeekOk` applies only to per-video weeks. F6: "wyświetleniach miniatur", one shared `when()` day phrase. F7/F8: spans inside alert buttons, `alerts()` computed once in Tracker. The `med` badge is „Ważne” (Rafał, 2026-10-26) |
+| Phase 3 report cap | Workers Paid: `MAX_REPORTS` raised from 10 to 40 per integration per run (cursor design F3 unchanged). The Reporting API creates up to ~30 daily reports for the 30-day backfill plus corrections, so the first run imports everything; each download is one subrequest (limit 10,000) and CPU stays small (small CSVs, 30 s limit) |
+| Phase 3 sync design | Per integration: refresh token → `channels.list` → uploads playlist (≤150 videos) → Analytics `day,video` for the last 28 days in chunks of 7 videos (7 × 28 = 196 rows, under the 200-row default cap, so nothing is silently truncated) → Reach reports after the cursor, oldest first, cursor moved after each report → weekly recompute. Analytics and Reach upserts name disjoint columns. Weekly rows are written only for complete Monday weeks (Sunday before today), skipping archived weeks; a manual week of the same date is overwritten in its metric columns and flagged `yt_api` (plan contract), `uploads`/`revenue_pln`/`note` are never sent |
+| Phase 3 OAuth | Redirect URI = `<origin>/api/yt/callback` (origin taken from the request, so the old and new host both work once registered). The callback also reuses an existing `channel_reach_basic_a1` job instead of creating a duplicate, sets `projects.yt_channel_id` when empty and pulls once right away (failures land in `last_error`). `state` = base64url(projectId + expiry 10 min) + HMAC-SHA256 with `STATE_SECRET` (WebCrypto). Owner check = `auth.getUser` plus `rpc(is_owner)` with the caller's own token |
+| Phase 3 secrets access | `secret(name)` reads `process.env` (OpenNext copies Worker bindings there) and falls back to `getCloudflareContext().env`. `cf-typegen` / `cloudflare-env.d.ts` skipped: secrets are not in `wrangler.jsonc`, so the generated type would not list them. `worker.ts` is excluded from `tsconfig` and imports the OpenNext output without `@ts-ignore` |
+| Phase 3 migration | `20261027100000_integrations.sql`, additive: new table `integrations` (RLS on, no policies, all privileges revoked from `anon`/`authenticated`), `integration_status()` (security definer, `is_owner()` check, no token), and `create or replace view v_video_recent` with the same columns and a 42-day window. Safe to apply before the merge: the live code does not call `integration_status`, and the old view consumers see the same shape |
+| Phase 3 `last_sync_at` / `Data.integrations` | `Data.integrations` is typed and loaded by `rpc(integration_status)`; the cast in `rules.ts` is gone; timestamps are shown in Europe/Warsaw (`localDateTime`). `videoWeekOk` uses 42 days to match the view. Note for Phase 5: `loadAll` with the service-role client would fail on `integration_status()` (no `is_owner` for the secret key), so the push code needs its own integrations read |
+| Phase 3 UI | A "YouTube" section on Dziś between alerts and gates, one card per `yt_channel`/`both` project: status line (niepołączony / połączony + last sync / błąd / wymagane ponowne połączenie / czekam na pierwszy raport CTR), "Połącz YouTube" or "Połącz ponownie" and "Synchronizuj teraz". The Google redirect result (`?yt=`) shows one toast and is removed from the URL. Public `/privacy` page (PL + EN, no e-mail) for the OAuth consent screen |
+| Phase 3 tooling | `vitest@3` (dev); `npm ci` was needed once because `npm i` failed on the old node_modules tree (arborist `edgesOut` bug). ESLint now ignores `.open-next/**` and `.wrangler/**` (build output made lint report ~10k problems) |
+| Phase 3 fixtures | `tests/fixtures/*` are hand-written to the documented formats (no OAuth token was available to capture a real call). **Unverified assumptions to check on the first real sync:** `video_thumbnail_impressions_ctr` is a fraction (0.05 = 5%) and is stored ×100; Analytics returns `day,video` rows for the `filters=video==` query without extra paging |
+| Phase 3 review F1-F8 | F1: weekly rows only for weeks fully inside the Analytics window (`toWeeks(rows, firstMondayOnOrAfter(windowStart))`), Reach-only weeks dropped, and weeks without Reach data are upserted without `impressions`/`ctr_pct` so a manual Studio value is never nulled. F2: `mapReach` sums lines per (video, date), CTR impression-weighted. F3: `scheduled` logs a non-ok cron status, the callback logs the error message only; `yt=no-channel` / `no-refresh-token` with Polish toasts. F4: `AbortSignal.timeout` 20 s on Google calls, 60 s on report downloads. F5: left open, fixtures to be replaced after the first real sync (3.8 stays open). F6: the post-connect sync runs in `ctx.waitUntil` after the redirect. F7: random nonce in an `HttpOnly; Secure; SameSite=Lax` cookie (`yt_nonce`, path `/api/yt`, 10 min) and in the signed state, compared in the callback. F8: reconnect is a `.btn` (44 px), errors mapped to Polish (`syncErrorPl`) with the raw text only in a detail line on the card |
 | F10 small fixes | All applied; synced weeks keep earning XP; t23/t24 kept, alerts suppressed |
 
 ## Progress
@@ -482,11 +494,11 @@ Delegated to the agent per Rafał's working rules (non-UI decisions are the agen
 
 #### Automated
 
-- [ ] 3.1 Integrations migration, token unreadable for authenticated
-- [ ] 3.2 YouTube mapping integration test passes
-- [ ] 3.3 Type checking passes
-- [ ] 3.4 Linting passes
-- [ ] 3.5 OpenNext build passes
+- [x] 3.1 Integrations migration, token unreadable for authenticated — c5e0618 — applied 2026-10-26 by orchestrator; authenticated/anon have no select on integrations
+- [x] 3.2 YouTube mapping integration test passes — c5e0618
+- [x] 3.3 Type checking passes — c5e0618
+- [x] 3.4 Linting passes — c5e0618
+- [x] 3.5 OpenNext build passes — c5e0618
 
 #### Manual
 

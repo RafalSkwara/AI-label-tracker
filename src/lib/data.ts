@@ -10,7 +10,7 @@ function check<T>(r: { data: T | null; error: { message: string } | null }): T {
 }
 
 export async function loadAll(db: SupabaseClient = supabase()): Promise<Data> {
-  const [tasks, items, weeks, subs, projects, gates, videos, settings, xp] = await Promise.all([
+  const [tasks, items, weeks, subs, projects, gates, videos, integrations, settings, xp] = await Promise.all([
     db.from("tasks").select("*").is("archived_at", null).order("created_at"),
     db.from("content_items").select("*").is("archived_at", null),
     db.from("weekly_stats").select("*").is("archived_at", null),
@@ -18,6 +18,7 @@ export async function loadAll(db: SupabaseClient = supabase()): Promise<Data> {
     db.from("projects").select("id,slug,name,niche,kind,status,yt_channel_id,distrokid_artist").is("archived_at", null).order("created_at"),
     db.from("gates").select("id,project_id,title,due,rules,note").is("archived_at", null).order("due"),
     db.from("v_video_recent").select("*"),
+    db.rpc("integration_status"),
     db.from("settings").select("budget_min,budget_max,usd_pln,vat_pct").maybeSingle(),
     db.from("v_xp_events").select("*").order("at", { ascending: false }),
   ]);
@@ -29,6 +30,7 @@ export async function loadAll(db: SupabaseClient = supabase()): Promise<Data> {
     projects: check(projects),
     gates: check(gates),
     videos: check(videos),
+    integrations: check(integrations) ?? [],
     settings: check(settings) ?? { budget_min: 200, budget_max: 500, usd_pln: 3.7, vat_pct: 23 },
     xp: check(xp),
   };

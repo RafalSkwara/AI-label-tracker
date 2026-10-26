@@ -68,11 +68,19 @@ export default function Tracker({ email }: { email: string }) {
   }, [apply, fail]);
 
   useEffect(() => {
+    // Result of the Google redirect (?yt=ok|denied|wrong-channel|error): tell the owner once, then drop it from the URL
+    try {
+      const u = new URL(window.location.href), y = u.searchParams.get("yt");
+      if (y) {
+        u.searchParams.delete("yt"); history.replaceState(null, "", u.pathname + u.search + u.hash);
+        setTimeout(() => flash(({ ok: "Połączono z YouTube", denied: "Anulowano łączenie z YouTube", "wrong-channel": "To konto YouTube to inny kanał niż w projekcie", "no-channel": "To konto Google nie ma kanału YouTube", "no-refresh-token": "Google nie przekazał trwałego dostępu — spróbuj połączyć ponownie i zaakceptuj wszystkie uprawnienia" } as Record<string, string>)[y] ?? "Nie udało się połączyć z YouTube"), 0);
+      }
+    } catch {}
     loadAll().then(apply, fail);
     const onVis = () => { if (document.visibilityState === "visible" && Date.now() - loadedAt.current > 60e3) load(); };
     document.addEventListener("visibilitychange", onVis);
     return () => document.removeEventListener("visibilitychange", onVis);
-  }, [apply, fail, load]);
+  }, [apply, fail, load, flash]);
 
   async function run(fn: () => Promise<void>, ok?: string) {
     setBusy(true);
@@ -167,7 +175,7 @@ export default function Tracker({ email }: { email: string }) {
           </nav>
 
           <main className="panel" role="tabpanel" aria-labelledby={"tab-" + tab}>
-            {tab === "dzis" && <Today data={data} today={today()} list={alertList} onOpen={openAlert} />}
+            {tab === "dzis" && <Today data={data} today={today()} list={alertList} onOpen={openAlert} onReload={load} flash={flash} />}
             {tab === "zadania" && <TasksPanel data={data} onAdd={() => setEditing({ coll: "tasks", rec: null })} onEdit={(t) => setEditing({ coll: "tasks", rec: t })}
               onToggle={(t, done) => {
                 setData({ ...data, tasks: data.tasks.map((x) => (x.id === t.id ? { ...x, done } : x)) });
