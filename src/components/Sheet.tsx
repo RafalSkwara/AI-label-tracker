@@ -2,15 +2,16 @@
 
 import { useEffect, useRef, useState } from "react";
 import { iso, monday, num } from "@/lib/format";
-import type { Channel, Coll } from "@/lib/types";
+import type { Coll, Project } from "@/lib/types";
 
-type Field = { k: string; l: string; t: "text" | "select" | "date" | "number" | "textarea" | "check" | "url" | "channel"; o?: string[]; wide?: boolean; req?: boolean; step?: string };
+type Field = { k: string; l: string; t: "text" | "select" | "date" | "number" | "textarea" | "check" | "url" | "project"; o?: string[]; wide?: boolean; req?: boolean; step?: string };
 
 const FIELDS: Record<Coll, Field[]> = {
   tasks: [
     { k: "title", l: "Zadanie", t: "text", wide: true, req: true },
     { k: "phase", l: "Faza", t: "select", o: ["F0", "F1", "F2", "F3"] },
     { k: "due", l: "Termin", t: "date" },
+    { k: "project_id", l: "Projekt", t: "project" },
     { k: "note", l: "Notatka", t: "textarea", wide: true },
     { k: "done", l: "Zrobione", t: "check" },
   ],
@@ -18,14 +19,14 @@ const FIELDS: Record<Coll, Field[]> = {
     { k: "title", l: "Tytuł roboczy", t: "text", wide: true, req: true },
     { k: "kind", l: "Rodzaj", t: "select", o: ["film", "EP", "short"] },
     { k: "status", l: "Status", t: "select", o: ["pomysł", "produkcja", "zaplanowany", "live"] },
-    { k: "channel_id", l: "Kanał", t: "channel" },
+    { k: "project_id", l: "Projekt", t: "project" },
     { k: "publish_date", l: "Data publikacji", t: "date" },
     { k: "url", l: "Link", t: "url", wide: true },
     { k: "note", l: "Notatka", t: "textarea", wide: true },
   ],
   weeks: [
     { k: "week_start", l: "Poniedziałek tygodnia", t: "date", req: true },
-    { k: "channel_id", l: "Kanał", t: "channel", req: true },
+    { k: "project_id", l: "Projekt", t: "project", req: true },
     { k: "uploads", l: "Opublikowane filmy", t: "number" },
     { k: "views", l: "Wyświetlenia", t: "number" },
     { k: "watch_hours", l: "Godziny oglądania", t: "number", step: "0.1" },
@@ -46,27 +47,28 @@ const FIELDS: Record<Coll, Field[]> = {
     { k: "paid_until", l: "Opłacone do", t: "date" },
     { k: "renew", l: "Następna płatność", t: "date" },
     { k: "plan_details", l: "Szczegóły planu", t: "textarea", wide: true },
+    { k: "project_id", l: "Projekt", t: "project" },
     { k: "dashboard_url", l: "Link do dashboardu", t: "url", wide: true },
     { k: "note", l: "Notatka", t: "textarea", wide: true },
   ],
 };
 
-function defaults(coll: Coll, channels: Channel[]): Record<string, unknown> {
-  const ch = channels[0]?.id ?? null;
+function defaults(coll: Coll, projects: Project[]): Record<string, unknown> {
+  const ch = projects[0]?.id ?? null;
   if (coll === "tasks") return { phase: "F0", done: false };
-  if (coll === "items") return { kind: "film", status: "pomysł", channel_id: ch };
+  if (coll === "items") return { kind: "film", status: "pomysł", project_id: ch };
   if (coll === "subs") return { currency: "USD", cycle: "mies", status: "planowana" };
   const d = new Date(); d.setDate(d.getDate() - 7);
-  return { week_start: monday(iso(d)), channel_id: ch };
+  return { week_start: monday(iso(d)), project_id: ch };
 }
 
 type Props = {
-  coll: Coll; rec: Record<string, unknown> | null; channels: Channel[]; noun: string;
+  coll: Coll; rec: Record<string, unknown> | null; projects: Project[]; noun: string;
   onClose: () => void; onSave: (out: Record<string, unknown>) => void; onDelete: () => void;
 };
 
-export default function Sheet({ coll, rec, channels, noun, onClose, onSave, onDelete }: Props) {
-  const [v, setV] = useState<Record<string, unknown>>(() => ({ ...defaults(coll, channels), ...(rec ?? {}) }));
+export default function Sheet({ coll, rec, projects, noun, onClose, onSave, onDelete }: Props) {
+  const [v, setV] = useState<Record<string, unknown>>(() => ({ ...defaults(coll, projects), ...(rec ?? {}) }));
   const [armed, setArmed] = useState(false);
   const [miss, setMiss] = useState("");
   const first = useRef<HTMLDivElement>(null);
@@ -109,10 +111,10 @@ export default function Sheet({ coll, rec, channels, noun, onClose, onSave, onDe
             );
             let input;
             if (f.t === "select") input = <select id={id} value={String(val ?? "")} onChange={set(f.k)}>{f.o!.map((o) => <option key={o} value={o}>{o}</option>)}</select>;
-            else if (f.t === "channel") input = (
+            else if (f.t === "project") input = (
               <select id={id} value={String(val ?? "")} onChange={set(f.k)}>
                 {!f.req && <option value="">—</option>}
-                {channels.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                {projects.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             );
             else if (f.t === "textarea") input = <textarea id={id} value={String(val ?? "")} onChange={set(f.k)} />;

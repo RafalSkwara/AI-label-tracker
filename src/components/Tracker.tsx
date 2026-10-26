@@ -163,7 +163,7 @@ export default function Tracker({ email }: { email: string }) {
       {!data && !error && <div className="empty"><strong>Wczytywanie…</strong><span>Dane przychodzą z Supabase.</span></div>}
 
       {editing && data && (
-        <Sheet coll={editing.coll} rec={editing.rec} channels={data.channels} noun={NOUN[editing.coll]}
+        <Sheet coll={editing.coll} rec={editing.rec} projects={data.projects} noun={NOUN[editing.coll]}
           onClose={() => setEditing(null)}
           onSave={(out) => { const e = editing; setEditing(null); run(() => saveRow(e.coll, e.rec, out), e.rec ? "Zapisano" : "Dodano"); }}
           onDelete={() => { const e = editing; setEditing(null); if (e.rec) run(() => archiveRow(e.coll, e.rec!), "Usunięto"); }} />
@@ -206,6 +206,7 @@ const Empty = ({ title, body }: { title: string; body: string }) => <div classNa
 
 function TasksPanel({ data, onAdd, onEdit, onToggle }: { data: Data; onAdd: () => void; onEdit: (t: Task) => void; onToggle: (t: Task, done: boolean) => void }) {
   const t0 = today(), soon = inDays(3);
+  const pname = (id: string | null) => data.projects.find((p) => p.id === id)?.name;
   return (
     <>
       <Head title="Zadania" sub="Każde odhaczone zadanie to +10 XP" noun={NOUN.tasks} onAdd={onAdd} />
@@ -220,7 +221,7 @@ function TasksPanel({ data, onAdd, onEdit, onToggle }: { data: Data; onAdd: () =
             {list.map((t) => (
               <div key={t.id} className={"task" + (t.done ? " done" : "")}>
                 <input type="checkbox" id={"t-" + t.id} checked={t.done} aria-label={"Oznacz jako zrobione: " + t.title} onChange={(e) => onToggle(t, e.target.checked)} />
-                <label className="t" htmlFor={"t-" + t.id}>{t.title}</label>
+                <label className="t" htmlFor={"t-" + t.id}>{t.title}{pname(t.project_id) && <span className="chip" style={{ marginLeft: ".5rem" }}>{pname(t.project_id)}</span>}</label>
                 {t.due ? <span className={"chip" + (!t.done && t.due < t0 ? " late" : !t.done && t.due <= soon ? " soon" : "")}>{dfmt(t.due)}</span> : <span />}
                 <button className="icon" aria-label="Edytuj" onClick={() => onEdit(t)}>Edytuj</button>
               </div>
@@ -233,7 +234,7 @@ function TasksPanel({ data, onAdd, onEdit, onToggle }: { data: Data; onAdd: () =
 }
 
 function PipelinePanel({ data, onAdd, onEdit }: { data: Data; onAdd: () => void; onEdit: (i: Item) => void }) {
-  const chan = (id: string | null) => data.channels.find((c) => c.id === id)?.name;
+  const chan = (id: string | null) => data.projects.find((c) => c.id === id)?.name;
   return (
     <>
       <Head title="Pipeline" sub="Film live to +50 XP, short +15, EP +40" noun={NOUN.items} onAdd={onAdd} />
@@ -250,7 +251,7 @@ function PipelinePanel({ data, onAdd, onEdit }: { data: Data; onAdd: () => void;
                     <span className="t">{i.title}</span>
                     <div className="meta">
                       <span className="chip">{i.kind}</span>
-                      {chan(i.channel_id) && <span className="chip">{chan(i.channel_id)}</span>}
+                      {chan(i.project_id) && <span className="chip">{chan(i.project_id)}</span>}
                       {i.publish_date && <span className="chip">{dfmt(i.publish_date)}</span>}
                     </div>
                     {i.url && /^https?:\/\//.test(i.url) && <a href={i.url} target="_blank" rel="noopener">Otwórz link</a>}
@@ -267,7 +268,7 @@ function PipelinePanel({ data, onAdd, onEdit }: { data: Data; onAdd: () => void;
 
 function WeeksPanel({ data, onAdd, onEdit }: { data: Data; onAdd: () => void; onEdit: (w: Week) => void }) {
   const w = [...data.weeks].sort((a, b) => a.week_start.localeCompare(b.week_start));
-  const multi = data.channels.length > 1;
+  const multi = data.projects.length > 1;
   const f = (v: number | null, d: number, suffix = "") => (num(v) == null ? "—" : nf(d).format(Number(v)) + suffix);
   return (
     <>
@@ -280,13 +281,13 @@ function WeeksPanel({ data, onAdd, onEdit }: { data: Data; onAdd: () => void; on
               <thead><tr>{["Tydzień", "Filmy", "Wyśw.", "Godz.", "Δ t/t", "Suby", "CTR", "AVD", "Przychód", "Notatka"].map((t) => <th key={t} scope="col">{t}</th>)}</tr></thead>
               <tbody>
                 {[...w].reverse().map((r) => {
-                  const prev = w.filter((x) => x.channel_id === r.channel_id && x.week_start < r.week_start).pop();
+                  const prev = w.filter((x) => x.project_id === r.project_id && x.week_start < r.week_start).pop();
                   const a = prev ? num(prev.watch_hours) : null, b = num(r.watch_hours);
                   let delta = "—", cls = "flat";
                   if (a != null && b != null && a > 0) { const pc = ((b - a) / a) * 100; delta = (pc > 0 ? "+" : "") + nf(0).format(pc) + "%"; cls = pc > 2 ? "up" : pc < -2 ? "down" : "flat"; }
                   return (
-                    <tr key={r.channel_id + r.week_start} tabIndex={0} onClick={() => onEdit(r)} onKeyDown={(e) => { if (e.key === "Enter") onEdit(r); }}>
-                      <td>{dfmt(r.week_start)}{multi ? " · " + (data.channels.find((c) => c.id === r.channel_id)?.name ?? "") : ""}</td>
+                    <tr key={r.project_id + r.week_start} tabIndex={0} onClick={() => onEdit(r)} onKeyDown={(e) => { if (e.key === "Enter") onEdit(r); }}>
+                      <td>{dfmt(r.week_start)}{multi ? " · " + (data.projects.find((c) => c.id === r.project_id)?.name ?? "") : ""}</td>
                       <td>{f(r.uploads, 0)}</td><td>{f(r.views, 0)}</td><td>{f(r.watch_hours, 1)}</td>
                       <td className={cls}>{delta}</td><td>{f(r.subs_net, 0)}</td><td>{f(r.ctr_pct, 1, "%")}</td>
                       <td>{f(r.avd_min, 1, " min")}</td><td>{f(r.revenue_pln, 2, " zł")}</td>
@@ -305,6 +306,7 @@ function WeeksPanel({ data, onAdd, onEdit }: { data: Data; onAdd: () => void; on
 
 function CostsPanel({ data, onAdd, onEdit, onSettings }: { data: Data; onAdd: () => void; onEdit: (s: Sub) => void; onSettings: (k: keyof Settings, v: number) => void }) {
   const c = costTotals(data), st = data.settings;
+  const pname = (id: string | null) => data.projects.find((p) => p.id === id)?.name;
   const order: Record<string, number> = { aktywna: 0, planowana: 1, anulowana: 2 };
   const field = (k: keyof Settings, l: string, step = "1") => (
     <div className="field" key={k}>
@@ -326,7 +328,7 @@ function CostsPanel({ data, onAdd, onEdit, onSettings }: { data: Data; onAdd: ()
           {[...data.subs].sort((a, b) => (order[a.status] ?? 3) - (order[b.status] ?? 3) || monthly(b, st) - monthly(a, st)).map((s) => (
             <button key={s.id} className={"subrow" + (s.status === "anulowana" ? " cancel" : "")} onClick={() => onEdit(s)}>
               <div style={{ minWidth: 0 }}>
-                <div className="n">{s.name + (s.plan ? " · " + s.plan : "")}</div>
+                <div className="n">{s.name + (s.plan ? " · " + s.plan : "") + (pname(s.project_id) ? " · " + pname(s.project_id) : "")}</div>
                 <div className="p">{`${nf(2).format(Number(s.price) || 0)} ${s.currency} / ${s.cycle === "rok" ? "rok" : "mies."}` + (s.note ? " · " + s.note : "")}</div>
               </div>
               <span className={"st " + s.status}>{s.status}</span>
@@ -346,6 +348,7 @@ function CostsPanel({ data, onAdd, onEdit, onSettings }: { data: Data; onAdd: ()
 
 function SubsPanel({ data, onAdd, onEdit }: { data: Data; onAdd: () => void; onEdit: (s: Sub) => void }) {
   const st = data.settings, order: Record<string, number> = { aktywna: 0, planowana: 1, anulowana: 2 };
+  const pname = (id: string | null) => data.projects.find((p) => p.id === id)?.name;
   const act = data.subs.filter((s) => s.status === "aktywna");
   const next = act.filter((s) => s.renew && daysTo(s.renew) >= 0).sort((a, b) => a.renew!.localeCompare(b.renew!))[0];
   const rel = (d: string) => { const n = daysTo(d); return n === 0 ? "dziś" : n > 0 ? `za ${n} ${n === 1 ? "dzień" : "dni"}` : `${-n} ${n === -1 ? "dzień" : "dni"} temu`; };
@@ -364,7 +367,7 @@ function SubsPanel({ data, onAdd, onEdit }: { data: Data; onAdd: () => void; onE
             <div key={s.id} className={"card subcard" + (s.status === "anulowana" ? " cancel" : "")} role="button" tabIndex={0}
               onClick={() => onEdit(s)} onKeyDown={(e) => { if (e.key === "Enter" && e.target === e.currentTarget) onEdit(s); }}>
               <div className="head">
-                <div style={{ minWidth: 0 }}><div className="t">{s.name}</div><div className="sub">{s.plan ?? "—"}</div></div>
+                <div style={{ minWidth: 0 }}><div className="t">{s.name}</div><div className="sub">{(s.plan ?? "—") + (pname(s.project_id) ? " · " + pname(s.project_id) : "")}</div></div>
                 <span className={"st " + s.status}>{s.status}</span>
               </div>
               <dl>

@@ -396,7 +396,9 @@ Rafał's decision (2026-10-26): no unit tests, only the key contact points.
 
 ## Migration Notes
 
-- `channels` is renamed in place (no copy, no drop); apply the phase 1 migration right before merging its PR (a short gap is acceptable for a private app).
+- `channels` is renamed in place (no copy, no drop). Zero downtime via expand + contract: `20261026120000_projects.sql` (expand) keeps a compat view `channels` and the old `channel_id` columns next to the new `project_id` ones, synced by triggers, so both the live `main` code and the Phase 1 code work against it; `20261026130000_projects_cleanup.sql` (contract) removes the view, triggers and `channel_id` columns, recreates `v_xp_events` on `project_id` and moves the `weekly_stats` PK to `(project_id, week_start)`.
+- Order: JSON backup of all tables → apply expand (`apply_migration`, single transaction, never piecewise in the SQL editor) → `select count(*)` checks (projects = 3, gates = 2) → old app still works → merge → wait for the Workers build → phone check → reload all open clients (phone PWA, other tabs) → apply contract → phone check. A stale client still running the old code would write `channel_id` after the contract drops it. Manual rollback for expand only: `supabase/rollback/20261026120000_projects_down.sql`, on the orchestrator's instruction.
+- Backup approach (done 2026-10-26): instead of a JSON dump, in-database copies of `channels`, `tasks`, `content_items`, `weekly_stats`, `subscriptions` and `settings` in schema `backup_20261026`. Expand applied via `apply_migration` (name `projects`); verified projects = 3, gates = 2, `channels` view = 3 rows, `channel_id`/`project_id` mismatches = 0, 17 tasks mapped, `v_xp_events` = 12 rows. Contract still pending.
 - Backup before migrating: dump all tables as JSON to `/mnt/project-files/backup/` (or the local equivalent).
 - Existing manual `weekly_stats` fields (`uploads`, `revenue_pln`, `note`) are never overwritten by the sync.
 
@@ -426,6 +428,10 @@ Delegated to the agent per Rafał's working rules (non-UI decisions are the agen
 | F7 invisible failure | `sync_failed` alert + `Data.integrations` |
 | F8 default tab | Always start on Dziś; saved tab → `sessionStorage` |
 | F9 rename | Fix A: rename becomes phase 4 (before push); step 0 URL allow-lists; query kept |
+| Phase 1 `v_video_recent` shape | One row per `(project_id, yt_video_id)` with 35-day sums (`views, watch_minutes, subs_net, impressions, clicks`) and a `weeks` jsonb array of per-week totals (Monday weeks); `clicks = Σ impressions × ctr / 100` so CTR can be impression-weighted later |
+| Phase 1 task→project mapping | Elektronika: t07, t25, t26. Slowfall: t03, t08–t11, t15, t16, t18–t24. Shared (null): t01, t02, t04–t06, t13, t14, t17 (account, tooling, legal) |
+| Phase 1 Sheet | `Channel` picker field renamed `project` ("Projekt"); added to tasks and subs forms as optional; project chip on task rows, cost rows and subscription cards |
+| Phase 1 zero downtime | Split into expand (compat view `channels`, `project_id` beside `channel_id`, sync triggers, unique index on `weekly_stats (project_id, week_start)`) and contract (cleanup migration, applied only after the deploy is verified); the sync trigger lets the changed column win, `project_id` when both changed. New code uses only `projects`/`project_id` and works in both schema states |
 | F10 small fixes | All applied; synced weeks keep earning XP; t23/t24 kept, alerts suppressed |
 
 ## Progress
@@ -436,15 +442,16 @@ Delegated to the agent per Rafał's working rules (non-UI decisions are the agen
 
 #### Automated
 
-- [ ] 1.1 Migration applies cleanly, projects = 3, gates = 2
-- [ ] 1.2 Type checking passes
-- [ ] 1.3 Linting passes
-- [ ] 1.4 OpenNext build passes
+- [x] 1.1 Expand migration applies cleanly, projects = 3, gates = 2, old app still works — expand applied 2026-10-26; backup schema backup_20261026; contract pending
+- [x] 1.2 Type checking passes — b4c650a
+- [x] 1.3 Linting passes — b4c650a
+- [x] 1.4 OpenNext build passes — b4c650a
 
 #### Manual
 
 - [ ] 1.5 Existing tabs, XP and badges work on the phone
 - [ ] 1.6 Project picker in the task form and chip on the list
+- [ ] 1.7 Cleanup (contract) migration applied after the deploy is verified, app still works on the phone
 
 ### Phase 2: Dziś screen and alert rules
 
