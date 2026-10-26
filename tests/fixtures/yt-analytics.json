@@ -1,0 +1,19 @@
+{
+  "kind": "youtubeAnalytics#resultTable",
+  "columnHeaders": [
+    { "name": "day", "columnType": "DIMENSION", "dataType": "STRING" },
+    { "name": "video", "columnType": "DIMENSION", "dataType": "STRING" },
+    { "name": "views", "columnType": "METRIC", "dataType": "INTEGER" },
+    { "name": "estimatedMinutesWatched", "columnType": "METRIC", "dataType": "INTEGER" },
+    { "name": "averageViewDuration", "columnType": "METRIC", "dataType": "INTEGER" },
+    { "name": "subscribersGained", "columnType": "METRIC", "dataType": "INTEGER" },
+    { "name": "subscribersLost", "columnType": "METRIC", "dataType": "INTEGER" }
+  ],
+  "rows": [
+    ["2026-10-12", "Y1zTI-zy9HA", 100, 600, 360, 3, 1],
+    ["2026-10-12", "yL4czbAFQ54", 50, 150, 180, 0, 0],
+    ["2026-10-18", "Y1zTI-zy9HA", 100, 300, 180, 1, 2],
+    ["2026-10-19", "Y1zTI-zy9HA", 40, 120, 180, 0, 0],
+    ["2026-10-20", "yL4czbAFQ54", 60, 240, 240, 2, 0]
+  ]
+}

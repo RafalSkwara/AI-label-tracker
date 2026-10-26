@@ -1,4 +1,4 @@
-import { nf } from "./format";
+import { localDateTime, nf } from "./format";
 import type { Data, Gate, GateRule } from "./types";
 
 export type Alert = {
@@ -12,9 +12,6 @@ export type Alert = {
 
 export type RuleStatus = { value: number | null; target: number | null; ok: boolean | null; label: string };
 export type GateStatus = { value: number | null; target: number | null; ok: boolean | null; daysLeft: number; label: string };
-
-/** Phase 3 adds Data.integrations; until then the field is absent and sync_failed stays silent */
-type IntegrationLike = { project_id: string; last_sync_at: string | null; last_error: string | null };
 
 const DAY = 864e5;
 const MIN_IMPRESSIONS = 100;
@@ -58,8 +55,8 @@ function anchorWeek(s: Series, today: string): string {
   return s.get(m)?.manual ? m : completeWeeks(today, 1)[0];
 }
 
-/** v_video_recent covers `date >= current_date - 35`, so its oldest week can be cut; such a week is not trusted */
-const videoWeekOk = (ws: string, today: string) => ws >= addDays(today, -35);
+/** v_video_recent covers `date >= current_date - 42`, so its oldest week can be cut; such a week is not trusted */
+const videoWeekOk = (ws: string, today: string) => ws >= addDays(today, -42);
 
 const val = (v: unknown): number | null => (v == null || v === "" || isNaN(Number(v)) ? null : Number(v));
 
@@ -212,14 +209,13 @@ export function alerts(d: Data, today: string, nowMs: number = Date.now()): Aler
     if (s.ok === false && s.daysLeft <= 14) out.push({ kind: "gate", severity: "high", title: g.title, detail: `${s.daysLeft < 0 ? "Termin minął" : "Termin " + dmy(g.due) + " (" + when(s.daysLeft) + ")"}, warunki niespełnione`, ref: g.id, projectId: g.project_id });
   }
 
-  const integrations = (d as Data & { integrations?: IntegrationLike[] }).integrations ?? [];
-  for (const i of integrations) {
+  for (const i of d.integrations) {
     const name = d.projects.find((p) => p.id === i.project_id)?.name ?? "YouTube";
     if (i.last_error) {
       const reconnect = /invalid_grant/.test(i.last_error);
       out.push({ kind: "sync_failed", severity: "high", title: `Synchronizacja YouTube: ${name}`, detail: reconnect ? "Wymagane ponowne połączenie konta YouTube" : i.last_error, ref: i.project_id, projectId: i.project_id });
     } else if (i.last_sync_at && nowMs - Date.parse(i.last_sync_at) > HOURS_36) {
-      out.push({ kind: "sync_failed", severity: "high", title: `Synchronizacja YouTube: ${name}`, detail: `Ostatnia udana synchronizacja ${dmy(i.last_sync_at)} (ponad 36 h temu)`, ref: i.project_id, projectId: i.project_id });
+      out.push({ kind: "sync_failed", severity: "high", title: `Synchronizacja YouTube: ${name}`, detail: `Ostatnia udana synchronizacja ${localDateTime(i.last_sync_at)} (ponad 36 h temu)`, ref: i.project_id, projectId: i.project_id });
     }
   }
 

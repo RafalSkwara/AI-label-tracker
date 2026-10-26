@@ -3,13 +3,14 @@
 import { dmy } from "@/lib/format";
 import { type Alert, gateRules, gateStatus, when } from "@/lib/rules";
 import type { Data } from "@/lib/types";
+import Integrations from "./Integrations";
 
 const SEV = { high: "Pilne", med: "Ważne", low: "Info" } as const;
 
 /** Alerts that open a record are tappable; the rest are informational */
 export const opensRecord = (a: Alert) => a.kind !== "gate" && a.kind !== "sync_failed";
 
-export default function Today({ data, today, list, onOpen }: { data: Data; today: string; list: Alert[]; onOpen: (a: Alert) => void }) {
+export default function Today({ data, today, list, onOpen, onReload, flash }: { data: Data; today: string; list: Alert[]; onOpen: (a: Alert) => void; onReload: () => void; flash: (m: string) => void }) {
   const pname = (id?: string) => data.projects.find((p) => p.id === id)?.name;
   return (
     <div className="today">
@@ -35,6 +36,8 @@ export default function Today({ data, today, list, onOpen }: { data: Data; today
             : <div key={a.kind + a.ref} className={"alert " + a.severity}>{body}</div>;
         })}
       </section>
+
+      <Integrations data={data} onDone={onReload} flash={flash} />
 
       <section className="gates" aria-label="Bramki">
         <span className="label">Bramki</span>

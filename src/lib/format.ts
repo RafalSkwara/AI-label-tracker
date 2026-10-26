@@ -14,3 +14,7 @@ export const monday = (s: string) => {
 };
 export const num = (v: unknown): number | null =>
   v === "" || v == null || isNaN(Number(v)) ? null : Number(v);
+
+/** Timestamp (ISO, UTC) shown in Warsaw local time, e.g. "26.10, 07:05" */
+export const localDateTime = (t: string) =>
+  new Intl.DateTimeFormat("pl-PL", { timeZone: "Europe/Warsaw", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }).format(new Date(t));

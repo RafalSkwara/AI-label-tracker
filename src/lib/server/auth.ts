@@ -1,0 +1,49 @@
+import { createClient } from "@supabase/supabase-js";
+import { secret } from "./env";
+
+const enc = new TextEncoder();
+
+/** Verifies the Supabase access token in `Authorization: Bearer` and that its user is in app_owners (RLS helper is_owner) */
+export async function requireOwner(req: Request): Promise<boolean> {
+  const token = /^Bearer (.+)$/.exec(req.headers.get("authorization") ?? "")?.[1];
+  if (!token) return false;
+  const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!, {
+    global: { headers: { Authorization: `Bearer ${token}` } },
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const { data: user, error } = await db.auth.getUser(token);
+  if (error || !user.user) return false;
+  const { data } = await db.rpc("is_owner");
+  return data === true;
+}
+
+/** Constant-time string compare */
+export function safeEqual(a: string, b: string): boolean {
+  const x = enc.encode(a), y = enc.encode(b);
+  let d = x.length ^ y.length;
+  for (let i = 0; i < Math.max(x.length, y.length); i++) d |= (x[i] ?? 0) ^ (y[i] ?? 0);
+  return d === 0;
+}
+
+const b64u = (b: Uint8Array) => btoa(String.fromCharCode(...b)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+const hmac = async (msg: string) => {
+  const key = await crypto.subtle.importKey("raw", enc.encode(secret("STATE_SECRET")), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  return b64u(new Uint8Array(await crypto.subtle.sign("HMAC", key, enc.encode(msg))));
+};
+
+/** OAuth `state`: project id + expiry, HMAC-signed */
+export async function signState(projectId: string, ttlMs = 10 * 60e3): Promise<string> {
+  const body = b64u(enc.encode(JSON.stringify({ p: projectId, e: Date.now() + ttlMs })));
+  return `${body}.${await hmac(body)}`;
+}
+
+export async function verifyState(state: string): Promise<string | null> {
+  const [body, sig] = state.split(".");
+  if (!body || !sig || !safeEqual(sig, await hmac(body))) return null;
+  try {
+    const { p, e } = JSON.parse(atob(body.replace(/-/g, "+").replace(/_/g, "/")));
+    return typeof p === "string" && typeof e === "number" && e > Date.now() ? p : null;
+  } catch {
+    return null;
+  }
+}

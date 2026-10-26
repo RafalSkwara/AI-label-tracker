@@ -202,3 +202,12 @@ button.alert:hover{border-color:var(--muted)}
 .gate .rules .ok{color:var(--good)} .gate .rules .no{color:var(--bad)} .gate .rules .nd{color:var(--muted)}
 .gate .pill{font-size:.75rem;border-radius:99px;padding:1px 10px;border:1px solid currentColor;white-space:nowrap}
 .gate .pill.ok{color:var(--good)} .gate .pill.no{color:var(--bad)} .gate .pill.nd{color:var(--muted)}
+
+.integrations{display:grid;gap:8px}
+.integrations .actions{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.ytstate.ok{color:var(--good)} .ytstate.no{color:var(--bad)}
+.legal{max-width:680px;margin:0 auto;display:grid;gap:14px}
+.legal section{display:grid;gap:8px}
+.legal p,.legal ul{margin:0}
+.legal ul{padding-left:1.2rem}
+.legal hr{border:0;border-top:1px solid var(--line);margin:8px 0;width:100%}
