@@ -43,7 +43,7 @@
 - **Location**: src/lib/rules.ts:131 (with `projectWeeks` at src/lib/rules.ts:51-69 and `hoursInRange` at src/lib/rules.ts:107)
 - **Detail**: `lastDay = min(today − 3, monthEnd)` is a day, not the end of a complete week, so the range almost always ends inside an incomplete week. That week's total comes from `v_video_recent.weeks` (whose newest week is partial and is not filtered at the newer end) or, from Phase 3 on, from a synced `weekly_stats` row for the running week. `hoursInRange` spreads that partial total over 7 days, so the target month is undercounted while the `vs` month uses complete weeks. Example: on the due date 2027-01-16, `lastDay` = 01-13 (Wed); week 01-11 holds only ~2–3 days of data but counts as 3/7 of a "full" week, so January loses roughly half of that week's hours. This biases Bramka F1 towards `ok=false`, and within 14 days of its due date that becomes a high `gate` alert — exactly when the decision is made. The plan says "up to the last complete day"; the data granularity is weekly, so a complete day only exists inside a complete week.
 - **Fix**: Cap `lastDay` at the Sunday of the last complete week (`addDays(completeWeeks(today, 1)[0], 6)`) instead of `today − 3`, so both ranges are built only from complete weeks; record it in Review decisions.
-- **Decision**: accepted, fixed in SHA_X (range capped at the Sunday of the last complete week)
+- **Decision**: accepted, fixed in ef99fc6 (range capped at the Sunday of the last complete week)
 
 ### F2 — Manually entered weeks are invisible to the rules for two days
 
@@ -62,7 +62,7 @@
   - Tradeoff: The confusing behaviour stays, every week.
   - Confidence: HIGH — documentation only.
   - Blind spot: None significant.
-- **Decision**: Fix A, applied in SHA_X (manual weeks are complete once their Sunday has passed; check 2.5 works on any day)
+- **Decision**: Fix A, applied in ef99fc6 (manual weeks are complete once their Sunday has passed; check 2.5 works on any day)
 
 ### F3 — `?tab=` stays in the URL and wins over the session tab on reload
 
@@ -72,7 +72,7 @@
 - **Location**: src/components/Tracker.tsx:34, src/components/Tracker.tsx:80
 - **Detail**: The query parameter is read on mount but never removed, and `pickTab` does not update it. After arriving via `/?tab=dzis&yt=ok` (Phase 3 OAuth callback) or `/?tab=dzis` (Phase 5 push tap), switching to Zadania and reloading lands on Dziś again, so "survives reloads within a session" breaks for those entry points. Harmless in Phase 2 alone (`start_url` is `/`), but both later phases rely on these URLs.
 - **Fix**: After reading `tab`, remove it with `history.replaceState` (keeping other params such as `yt`), or write the current tab into the URL in `pickTab`.
-- **Decision**: fixed in SHA_X (`?tab=` removed with replaceState, other params kept)
+- **Decision**: fixed in ef99fc6 (`?tab=` removed with replaceState, other params kept)
 
 ### F4 — The 28-day CTR window shrinks to 21 days every Tuesday
 
@@ -82,7 +82,7 @@
 - **Location**: src/lib/rules.ts:82, src/lib/rules.ts:100
 - **Detail**: The oldest of the 4 complete weeks starts between today − 36 and today − 30. On Tuesdays it starts at today − 36, `videoWeekOk` drops it, and `ctr_last3_weighted` uses 3 weeks. The same filtered set is also applied to the channel-level `weekly_stats` fallback, which the 35-day view does not limit at all. Accepted in spirit by the "complete weeks" decision, but the result moves from day to day.
 - **Fix**: Apply `videoWeekOk` only to per-video weeks (not to the `weekly_stats` fallback); in the Phase 3 migration consider widening `v_video_recent` to 42 days so 4 complete weeks always fit.
-- **Decision**: fixed in SHA_X (`videoWeekOk` only on per-video weeks); Phase 3 note added: widen `v_video_recent` to 42 days
+- **Decision**: fixed in ef99fc6 (`videoWeekOk` only on per-video weeks); Phase 3 note added: widen `v_video_recent` to 42 days
 
 ### F5 — `sync_failed` and tab state: details to settle in Phase 3/manual checks
 
@@ -102,7 +102,7 @@
 - **Location**: src/lib/rules.ts:182, src/lib/rules.ts:32, src/components/Today.tsx:7-8
 - **Detail**: `ctr_low` says "przy 1 234 wyświetleń" — wrong case after "przy" and ambiguous with views ("wyświetlenia" is also Studio's word for views); the gate rule label correctly says "Wyświetlenia miniatur". The `med` badge "Wkrótce" fits due tasks and renewals but not a CTR or impressions drop. `when()` in rules says "jutro" while the gate card's `days()` says "za 1 dzień", and the two helpers duplicate day phrasing. All other strings are Polish and consistent with existing UI ("Następna płatność", "t/t", "brak danych").
 - **Fix**: "przy N wyświetleniach miniatur"; rename the `med` badge to e.g. "Ważne"; use one day-phrase helper for both files.
-- **Decision**: wording and shared `when()` fixed in SHA_X; `med` badge rename pending Rafał
+- **Decision**: wording and shared `when()` fixed in ef99fc6; `med` badge rename pending Rafał
 
 ### F7 — Block elements inside a `<button>`
 
@@ -112,7 +112,7 @@
 - **Location**: src/components/Today.tsx:29-31
 - **Detail**: Tappable alerts render `<div className="t">` / `<div className="d">` inside `<button>`; buttons allow only phrasing content. Browsers render it, but it is invalid HTML and some screen readers flatten it oddly.
 - **Fix**: Use `<span>` with `display:block` for `.t` and `.d`.
-- **Decision**: fixed in SHA_X (spans with display:block)
+- **Decision**: fixed in ef99fc6 (spans with display:block)
 
 ### F8 — `alerts()` runs twice per render
 
@@ -122,7 +122,7 @@
 - **Location**: src/components/Tracker.tsx:158, src/components/Today.tsx:14
 - **Detail**: The tab count and the Dziś panel each call `alerts()` (which calls `gateStatus` per gate) on every render of `Tracker`. Negligible at current data sizes; noted only so Phase 3 (more videos) does not multiply it.
 - **Fix**: Compute the list once in `Tracker` (`useMemo` on `data`) and pass it to `Today`.
-- **Decision**: fixed in SHA_X (`useMemo` in Tracker)
+- **Decision**: fixed in ef99fc6 (`useMemo` in Tracker)
 
 ## Before merge
 
