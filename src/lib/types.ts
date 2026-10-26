@@ -17,6 +17,7 @@ export type Item = {
   status: "pomysł" | "produkcja" | "zaplanowany" | "live";
   publish_date: string | null;
   url: string | null;
+  yt_video_id: string | null;
   note: string | null;
   live_at: string | null;
   updated_at: string;
