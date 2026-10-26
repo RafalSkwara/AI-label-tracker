@@ -211,3 +211,5 @@ button.alert:hover{border-color:var(--muted)}
 .legal p,.legal ul{margin:0}
 .legal ul{padding-left:1.2rem}
 .legal hr{border:0;border-top:1px solid var(--line);margin:8px 0;width:100%}
+.integrations .btn{min-height:44px}
+.ytdetail{font-size:.75rem;overflow-wrap:anywhere}

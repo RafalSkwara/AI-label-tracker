@@ -84,7 +84,7 @@ Manual 3.6–3.8 are open (`[ ]`), which is expected before deploy. Row 3.1 is t
   - Tradeoff: The oldest ~1 week of the backfill is not written; with a 28-day window there are still 3 complete weeks, which is what the rules use.
   - Confidence: HIGH — follows directly from `start = now − 28 d` and `first = mondayOf(fromDate)`; `weekly_stats` is empty today so nothing to repair yet.
   - Blind spot: Whether Studio's week totals use Pacific days (Analytics `day` is Pacific); unrelated to this fix.
-- **Decision**: PENDING
+- **Decision**: Fixed: weeks only fully inside the Analytics window; no Reach-only weeks; absent Reach metrics never sent; partial-week test added.
 
 ### F2 — Reach rows are not de-duplicated per (video, date); one duplicate blocks the cursor forever
 
@@ -94,7 +94,7 @@ Manual 3.6–3.8 are open (`[ ]`), which is expected before deploy. Row 3.1 is t
 - **Location**: src/lib/ytMap.ts:64-82, src/lib/server/ytSync.ts:79-83
 - **Detail**: `mapReach` emits one row per CSV line, and the whole report goes into one upsert on `(yt_video_id, date)`. If a report ever has two lines for the same video and day, Postgres rejects the batch with "ON CONFLICT DO UPDATE command cannot affect row a second time". That could come from an extra dimension column (e.g. `live_or_on_demand`/`subscribed_status` if present in this report type) or from a channel and video split. The cursor is not advanced, so every later run fails on the same report: `sync_failed` every day and no more CTR. The fixtures are hand-written to the assumed format (plan "Phase 3 fixtures"), so the test cannot rule this out.
 - **Fix**: In `mapReach`, sum impressions and impression-weighted clicks per `(video_id, date)` before returning (CTR = Σclicks/Σimpressions); add a fixture line that splits one video-day.
-- **Decision**: PENDING
+- **Decision**: Fixed: Reach lines summed per (video, date), impression-weighted CTR; fixture line splits a video-day.
 
 ### F3 — Cron and callback failures are invisible to logs
 
@@ -104,7 +104,7 @@ Manual 3.6–3.8 are open (`[ ]`), which is expected before deploy. Row 3.1 is t
 - **Location**: worker.ts:11, src/app/api/yt/callback/route.ts:30
 - **Detail**: `scheduled` discards the `/api/cron` response, so a 401 (e.g. a `CRON_SECRET` mismatch) or 500 logs nothing. The callback `catch {}` turns every failure into `?yt=error` with no cause recorded anywhere: the token exchange, the `channels.list` "no channel" case, the upsert error. At that point there is no `integrations` row to hold `last_error`. The 36-hour staleness alert eventually covers the cron, but nothing covers the callback.
 - **Fix**: In `scheduled`, `console.error` the status when the response is not ok. In the callback, `console.error` the error message (never the code or tokens), and map known causes to distinct `yt=` values (`no-channel`, `no-refresh-token`).
-- **Decision**: PENDING
+- **Decision**: Fixed: cron status and callback error messages logged (no codes/tokens); yt=no-channel and no-refresh-token with Polish toasts.
 
 ### F4 — No timeouts on Google calls; one hung request stalls the whole run
 
@@ -114,7 +114,7 @@ Manual 3.6–3.8 are open (`[ ]`), which is expected before deploy. Row 3.1 is t
 - **Location**: src/lib/server/google.ts:35-39, 53, 116-119
 - **Detail**: None of the `fetch` calls has a timeout, and integrations sync one after another. A stalled Google request keeps the cron invocation alive until the platform kills it. Then no `last_error` is written for that integration or any later one. The same applies to the callback, where the owner waits on a blank page on the phone.
 - **Fix**: Pass `signal: AbortSignal.timeout(20_000)` (reports: 60 s) to the fetches in `google.ts`.
-- **Decision**: PENDING
+- **Decision**: Fixed: 20 s timeout on Google calls, 60 s on report downloads.
 
 ### F5 — Integration test fixtures are hand-written, not captured
 
@@ -124,7 +124,7 @@ Manual 3.6–3.8 are open (`[ ]`), which is expected before deploy. Row 3.1 is t
 - **Location**: tests/fixtures/yt-analytics.json, tests/fixtures/reach.csv
 - **Detail**: The plan asked for a fixture "captured from a real call". The coder documented why that was impossible and listed the unverified assumptions: CTR as a fraction ×100, and no Analytics paging. The test is meaningful for what it covers: disjoint columns, Monday weeks, minutes → hours, weighted AVD/CTR, null when there is no Reach data. But it pins the assumed API shape, not the real one. If CTR is already a percent, every stored CTR is 100× too high and the `ctr_low` alert never fires.
 - **Fix**: After the first real sync, replace both fixtures with captured, trimmed payloads, and keep 3.8 open until CTR matches Studio.
-- **Decision**: PENDING
+- **Decision**: Deferred: replace fixtures after the first real sync; 3.8 stays open.
 
 ### F6 — Callback runs a full sync before redirecting
 
@@ -134,7 +134,7 @@ Manual 3.6–3.8 are open (`[ ]`), which is expected before deploy. Row 3.1 is t
 - **Location**: src/app/api/yt/callback/route.ts:28
 - **Detail**: `await syncAll(db, projectId)` happens inside the redirect response: token refresh, `channels.list`, up to 3 playlist pages and up to 22 Analytics queries. That is several seconds of blank page on the phone. The result is also "Połączono" even if the sync failed (only the card shows the error). It works, and it was planned ("pulls once right away").
 - **Fix**: Wrap it in `getCloudflareContext().ctx.waitUntil(...)` and redirect immediately; the Dziś reload shows the result.
-- **Decision**: PENDING
+- **Decision**: Fixed: first sync via ctx.waitUntil, immediate redirect.
 
 ### F7 — OAuth `state` is replayable and not bound to the browser
 
@@ -144,7 +144,7 @@ Manual 3.6–3.8 are open (`[ ]`), which is expected before deploy. Row 3.1 is t
 - **Location**: src/lib/server/auth.ts:35-49
 - **Detail**: Within its 10 minutes, a valid `state` works with any authorization code, and there is no nonce cookie or PKCE. Someone who sees the owner's consent URL could finish the flow with their own Google account. For a project with no `yt_channel_id` (Contents May Vary today), that attaches their channel. Risk is low: the state appears only in the owner's own browser, and getting one requires the owner's Supabase session.
 - **Fix**: Set an `HttpOnly; Secure; SameSite=Lax` cookie with a random nonce in `/api/yt/connect`, put the nonce in the signed state, and compare it in the callback. Optionally add PKCE.
-- **Decision**: PENDING
+- **Decision**: Fixed: nonce cookie (HttpOnly; Secure; SameSite=Lax) plus nonce in the signed state, compared in the callback.
 
 ### F8 — Small UI items: tap target, raw English errors, cron host for phase 4
 
@@ -154,7 +154,7 @@ Manual 3.6–3.8 are open (`[ ]`), which is expected before deploy. Row 3.1 is t
 - **Location**: src/components/Integrations.tsx:13, 66; worker.ts:10
 - **Detail**: (a) "Połącz ponownie" renders as `.linkbtn` (0.8 rem, padding 0), a tap target well under 44 px on the phone. (b) `Błąd synchronizacji: ` + `last_error` shows raw English Google/Supabase text up to 300 characters inside a Polish UI and the `sync_failed` alert. (c) Phase 4 note: the cron request uses host `cron.internal`; any old-host → new-host redirect added in phase 4 must not catch it, or the cron silently gets a 301.
 - **Fix**: Give the reconnect action `.btn` styling. Map the common errors (`invalid_grant`, quota, network, `different channel`) to Polish text and show the raw text only in detail. Add the `cron.internal` exemption to the phase 4 plan.
-- **Decision**: PENDING
+- **Decision**: Fixed: reconnect uses .btn (44 px); Polish error mapping with raw text as detail; cron.internal note added to Phase 4 in plan.md.
 
 ## Gating
 

@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { mapAnalytics, mapReach, toWeeks, type VideoDay } from "../ytMap";
+import { firstMondayOnOrAfter, mapAnalytics, mapReach, toWeeks, type VideoDay } from "../ytMap";
 import * as g from "./google";
 
 /** Reports downloaded per integration per run (Workers Paid; a 30-day backfill fits in one run) */
@@ -28,7 +28,7 @@ async function upsertChunks(db: SupabaseClient, table: string, rows: object[], o
 }
 
 /** Writes complete Monday weeks (Sunday before `today`) from video_daily; never touches manual fields or archived weeks */
-async function recomputeWeeks(db: SupabaseClient, projectId: string, fromDate: string, today: string): Promise<number> {
+async function recomputeWeeks(db: SupabaseClient, projectId: string, fromDate: string, windowStart: string, today: string): Promise<number> {
   const first = mondayOf(fromDate);
   const rows: VideoDay[] = [];
   for (let from = 0; ; from += 1000) {
@@ -40,14 +40,18 @@ async function recomputeWeeks(db: SupabaseClient, projectId: string, fromDate: s
     }
     if (page.length < 1000) break;
   }
-  const complete = toWeeks(rows).filter((w) => iso(Date.parse(w.week_start) + 6 * DAY) < today);
+  const complete = toWeeks(rows, firstMondayOnOrAfter(windowStart)).filter((w) => iso(Date.parse(w.week_start) + 6 * DAY) < today);
   if (!complete.length) return 0;
   const archived = new Set(
     (must(await db.from("weekly_stats").select("week_start").eq("project_id", projectId).not("archived_at", "is", null).in("week_start", complete.map((w) => w.week_start))) as { week_start: string }[])
       .map((r) => r.week_start));
-  const out = complete.filter((w) => !archived.has(w.week_start)).map((w) => ({ project_id: projectId, ...w, source: "yt_api" }));
-  await upsertChunks(db, "weekly_stats", out, "project_id,week_start");
-  return out.length;
+  const todo = complete.filter((w) => !archived.has(w.week_start));
+  // Weeks without Reach data yet must not send impressions/ctr_pct, or a manual Studio value would be overwritten with null
+  const withReach = todo.filter((w) => w.impressions != null).map((w) => ({ project_id: projectId, ...w, source: "yt_api" }));
+  const noReach = todo.filter((w) => w.impressions == null).map((w) => ({ project_id: projectId, week_start: w.week_start, views: w.views, watch_hours: w.watch_hours, subs_net: w.subs_net, avd_min: w.avd_min, source: "yt_api" }));
+  await upsertChunks(db, "weekly_stats", withReach, "project_id,week_start");
+  await upsertChunks(db, "weekly_stats", noReach, "project_id,week_start");
+  return todo.length;
 }
 
 export async function syncIntegration(db: SupabaseClient, row: Row, now = Date.now()): Promise<SyncResult> {
@@ -84,7 +88,7 @@ export async function syncIntegration(db: SupabaseClient, row: Row, now = Date.n
     }
 
     // 3. Weekly totals for every complete week touched
-    const weeks = await recomputeWeeks(db, pid, minDate, today);
+    const weeks = await recomputeWeeks(db, pid, minDate, start, today);
     await patch({ yt_channel_id: channel.id, last_sync_at: new Date(now).toISOString(), last_error: null });
     return { projectId: pid, ok: true, videos: ids.length, reports: reports.length, weeks };
   } catch (e) {

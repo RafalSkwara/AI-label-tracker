@@ -73,7 +73,7 @@ export default function Tracker({ email }: { email: string }) {
       const u = new URL(window.location.href), y = u.searchParams.get("yt");
       if (y) {
         u.searchParams.delete("yt"); history.replaceState(null, "", u.pathname + u.search + u.hash);
-        setTimeout(() => flash(({ ok: "Połączono z YouTube", denied: "Anulowano łączenie z YouTube", "wrong-channel": "To konto YouTube to inny kanał niż w projekcie" } as Record<string, string>)[y] ?? "Nie udało się połączyć z YouTube"), 0);
+        setTimeout(() => flash(({ ok: "Połączono z YouTube", denied: "Anulowano łączenie z YouTube", "wrong-channel": "To konto YouTube to inny kanał niż w projekcie", "no-channel": "To konto Google nie ma kanału YouTube", "no-refresh-token": "Google nie przekazał trwałego dostępu — spróbuj połączyć ponownie i zaakceptuj wszystkie uprawnienia" } as Record<string, string>)[y] ?? "Nie udało się połączyć z YouTube"), 0);
       }
     } catch {}
     loadAll().then(apply, fail);

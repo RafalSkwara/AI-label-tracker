@@ -31,18 +31,18 @@ const hmac = async (msg: string) => {
   return b64u(new Uint8Array(await crypto.subtle.sign("HMAC", key, enc.encode(msg))));
 };
 
-/** OAuth `state`: project id + expiry, HMAC-signed */
-export async function signState(projectId: string, ttlMs = 10 * 60e3): Promise<string> {
-  const body = b64u(enc.encode(JSON.stringify({ p: projectId, e: Date.now() + ttlMs })));
+/** OAuth `state`: project id + browser nonce + expiry, HMAC-signed. The nonce also travels in an HttpOnly cookie. */
+export async function signState(projectId: string, nonce: string, ttlMs = 10 * 60e3): Promise<string> {
+  const body = b64u(enc.encode(JSON.stringify({ p: projectId, n: nonce, e: Date.now() + ttlMs })));
   return `${body}.${await hmac(body)}`;
 }
 
-export async function verifyState(state: string): Promise<string | null> {
+export async function verifyState(state: string): Promise<{ projectId: string; nonce: string } | null> {
   const [body, sig] = state.split(".");
   if (!body || !sig || !safeEqual(sig, await hmac(body))) return null;
   try {
-    const { p, e } = JSON.parse(atob(body.replace(/-/g, "+").replace(/_/g, "/")));
-    return typeof p === "string" && typeof e === "number" && e > Date.now() ? p : null;
+    const { p, n, e } = JSON.parse(atob(body.replace(/-/g, "+").replace(/_/g, "/")));
+    return typeof p === "string" && typeof n === "string" && typeof e === "number" && e > Date.now() ? { projectId: p, nonce: n } : null;
   } catch {
     return null;
   }

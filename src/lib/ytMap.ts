@@ -67,18 +67,21 @@ export function mapReach(csv: string): VideoDay[] {
   const head = cells(lines[0]);
   const [iDate, iVideo, iImp, iCtr] = ["date", "video_id", "video_thumbnail_impressions", "video_thumbnail_impressions_ctr"].map((n) => head.indexOf(n));
   if (iDate < 0 || iVideo < 0 || iImp < 0 || iCtr < 0) throw new Error("Reach report lacks the expected columns");
-  const out: VideoDay[] = [];
+  // A video-day may be split over several lines; one upsert must not hit the same key twice, so sum them
+  const byKey = new Map<string, { id: string; date: string; imp: number; clicks: number }>();
   for (const line of lines.slice(1)) {
     const c = cells(line), id = c[iVideo]?.trim(), d = c[iDate]?.trim();
     if (!id || !d || d.length !== 8) continue;
-    out.push({
-      yt_video_id: id,
-      date: `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}`,
-      impressions: Number(c[iImp]) || 0,
-      ctr_pct: Math.round((Number(c[iCtr]) || 0) * 100 * 1e4) / 1e4,
-    });
+    const date = `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}`, imp = Number(c[iImp]) || 0;
+    const a = byKey.get(id + "|" + date) ?? { id, date, imp: 0, clicks: 0 };
+    a.imp += imp;
+    a.clicks += imp * (Number(c[iCtr]) || 0);
+    byKey.set(id + "|" + date, a);
   }
-  return out;
+  return [...byKey.values()].map((a) => ({
+    yt_video_id: a.id, date: a.date, impressions: a.imp,
+    ctr_pct: a.imp ? Math.round((a.clicks / a.imp) * 100 * 1e4) / 1e4 : 0,
+  }));
 }
 
 const DAY = 864e5;
@@ -86,14 +89,20 @@ const mondayOf = (d: string) => {
   const t = Date.parse(d + "T00:00:00Z");
   return new Date(t - ((new Date(t).getUTCDay() + 6) % 7) * DAY).toISOString().slice(0, 10);
 };
+/** First Monday on or after `d` */
+export const firstMondayOnOrAfter = (d: string) => {
+  const m = mondayOf(d);
+  return m === d ? m : new Date(Date.parse(m + "T00:00:00Z") + 7 * DAY).toISOString().slice(0, 10);
+};
 const r2 = (x: number) => Math.round(x * 100) / 100;
 
 /**
  * VideoDay rows (Analytics and Reach rows of the same video-day may be separate entries) → one row per Monday week.
  * watch_hours = Σ minutes / 60; avd_min = view-weighted mean of avd_sec / 60; ctr_pct = impression-weighted mean.
  * Metrics with no data in a week are null, not 0 (Reach lags Analytics by ~2 days).
+ * `from` = first Monday fully inside the Analytics window.
  */
-export function toWeeks(rows: VideoDay[]): WeekRow[] {
+export function toWeeks(rows: VideoDay[], from?: string): WeekRow[] {
   type Acc = { views: number; minutes: number; subs: number; avdW: number; avdViews: number; imp: number; clicks: number; hasA: boolean; hasR: boolean };
   const acc = new Map<string, Acc>();
   for (const r of rows) {
@@ -103,7 +112,9 @@ export function toWeeks(rows: VideoDay[]): WeekRow[] {
     if (r.impressions != null) { a.hasR = true; a.imp += r.impressions; a.clicks += r.impressions * (r.ctr_pct ?? 0) / 100; }
     acc.set(k, a);
   }
-  return [...acc.entries()].sort(([x], [y]) => x.localeCompare(y)).map(([week_start, a]) => ({
+  // Only weeks with Analytics data, and (with `from`) only weeks starting on/after it: a week the Analytics window
+  // cuts in half, or one that has only Reach rows, would be written with understated or zero metrics.
+  return [...acc.entries()].filter(([k, a]) => a.hasA && (!from || k >= from)).sort(([x], [y]) => x.localeCompare(y)).map(([week_start, a]) => ({
     week_start,
     views: a.views,
     watch_hours: r2(a.minutes / 60),

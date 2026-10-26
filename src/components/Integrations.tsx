@@ -1,16 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { localDateTime } from "@/lib/format";
+import { localDateTime, syncErrorPl } from "@/lib/format";
 import { supabase } from "@/lib/supabase";
 import type { Data, Integration, Project } from "@/lib/types";
 
 /** One line of status per YouTube project, in Polish */
-export function ytStatus(i: Integration | undefined): { text: string; tone: "ok" | "no" | "nd" } {
+export function ytStatus(i: Integration | undefined): { text: string; tone: "ok" | "no" | "nd"; detail?: string } {
   if (!i) return { text: "Niepołączony", tone: "nd" };
-  if (i.last_error) return /invalid_grant/.test(i.last_error)
-    ? { text: "Wymagane ponowne połączenie konta", tone: "no" }
-    : { text: "Błąd synchronizacji: " + i.last_error, tone: "no" };
+  if (i.last_error) return { text: syncErrorPl(i.last_error), tone: "no", detail: i.last_error };
   const when = i.last_sync_at ? "ostatnia synchronizacja " + localDateTime(i.last_sync_at) : "jeszcze nie synchronizowano";
   return i.reporting_job_id && !i.reports_cursor
     ? { text: `Połączony, ${when} · czekam na pierwszy raport CTR (1–2 dni)`, tone: "ok" }
@@ -59,11 +57,12 @@ export default function Integrations({ data, onDone, flash }: { data: Data; onDo
               <div style={{ minWidth: 0 }}>
                 <h3>{p.name}</h3>
                 <p className={"sub ytstate " + s.tone}>{s.text}</p>
+                {s.detail && <p className="sub ytdetail">{s.detail}</p>}
               </div>
             </div>
             <div className="actions">
               {i && <button className="btn" disabled={busy === p.id} onClick={() => sync(p)}>{busy === p.id ? "Synchronizuję…" : "Synchronizuj teraz"}</button>}
-              <button className={i && !i.last_error ? "linkbtn" : "btn primary"} disabled={busy === p.id} onClick={() => connect(p)}>{i ? "Połącz ponownie" : "Połącz YouTube"}</button>
+              <button className={i && !i.last_error ? "btn" : "btn primary"} disabled={busy === p.id} onClick={() => connect(p)}>{i ? "Połącz ponownie" : "Połącz YouTube"}</button>
             </div>
           </article>
         );

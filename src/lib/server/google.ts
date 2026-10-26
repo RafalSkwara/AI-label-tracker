@@ -4,10 +4,13 @@ const SCOPES = ["https://www.googleapis.com/auth/youtube.readonly", "https://www
 export const REACH_REPORT = "channel_reach_basic_a1";
 
 export class GoogleError extends Error {
-  constructor(message: string, readonly status: number) {
+  constructor(message: string, readonly status: number, readonly code?: "no-channel" | "no-refresh-token") {
     super(message);
   }
 }
+
+/** fetch with a timeout (20 s; report downloads 60 s), so one hung request cannot stall a whole sync */
+const tfetch = (url: string, init: RequestInit = {}, ms = 20_000) => fetch(url, { ...init, signal: AbortSignal.timeout(ms) });
 
 async function json<T>(r: Response, what: string): Promise<T> {
   const text = await r.text();
@@ -33,7 +36,7 @@ export function authUrl(origin: string, state: string): string {
 }
 
 const token = (body: Record<string, string>) =>
-  fetch("https://oauth2.googleapis.com/token", {
+  tfetch("https://oauth2.googleapis.com/token", {
     method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({ client_id: secret("GOOGLE_CLIENT_ID"), client_secret: secret("GOOGLE_CLIENT_SECRET"), ...body }),
   });
@@ -41,7 +44,7 @@ const token = (body: Record<string, string>) =>
 export async function exchangeCode(origin: string, code: string) {
   const j = await json<{ access_token: string; refresh_token?: string }>(
     await token({ grant_type: "authorization_code", code, redirect_uri: redirectUri(origin) }), "token exchange");
-  if (!j.refresh_token) throw new GoogleError("Google returned no refresh token", 400);
+  if (!j.refresh_token) throw new GoogleError("Google returned no refresh token", 400, "no-refresh-token");
   return { accessToken: j.access_token, refreshToken: j.refresh_token };
 }
 
@@ -50,7 +53,7 @@ export async function refreshAccess(refreshToken: string): Promise<string> {
   return j.access_token;
 }
 
-const get = async <T>(url: string, at: string, what: string) => json<T>(await fetch(url, { headers: { authorization: `Bearer ${at}` } }), what);
+const get = async <T>(url: string, at: string, what: string) => json<T>(await tfetch(url, { headers: { authorization: `Bearer ${at}` } }), what);
 const qs = (o: Record<string, string | number | undefined>) =>
   new URLSearchParams(Object.entries(o).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])).toString();
 
@@ -58,7 +61,7 @@ export async function myChannel(at: string): Promise<{ id: string; uploads: stri
   const j = await get<{ items?: { id: string; contentDetails?: { relatedPlaylists?: { uploads?: string } } }[] }>(
     "https://www.googleapis.com/youtube/v3/channels?" + qs({ part: "id,contentDetails", mine: "true" }), at, "channels.list");
   const c = j.items?.[0];
-  if (!c?.contentDetails?.relatedPlaylists?.uploads) throw new GoogleError("No YouTube channel on this account", 404);
+  if (!c?.contentDetails?.relatedPlaylists?.uploads) throw new GoogleError("No YouTube channel on this account", 404, "no-channel");
   return { id: c.id, uploads: c.contentDetails.relatedPlaylists.uploads };
 }
 
@@ -91,7 +94,7 @@ export async function ensureReachJob(at: string): Promise<string> {
   const list = await get<{ jobs?: { id: string; reportTypeId: string }[] }>(`${REPORTING}/jobs?` + qs({ pageSize: 100 }), at, "jobs.list");
   const found = list.jobs?.find((j) => j.reportTypeId === REACH_REPORT);
   if (found) return found.id;
-  const r = await fetch(`${REPORTING}/jobs`, {
+  const r = await tfetch(`${REPORTING}/jobs`, {
     method: "POST", headers: { authorization: `Bearer ${at}`, "content-type": "application/json" },
     body: JSON.stringify({ reportTypeId: REACH_REPORT, name: "side-hustle-reach" }),
   });
@@ -114,7 +117,7 @@ export async function listReports(at: string, jobId: string, after: string | nul
 }
 
 export async function downloadReport(at: string, url: string): Promise<string> {
-  const r = await fetch(url, { headers: { authorization: `Bearer ${at}` } });
+  const r = await tfetch(url, { headers: { authorization: `Bearer ${at}` } }, 60_000);
   if (!r.ok) throw new GoogleError(`report download: ${r.status}`, r.status);
   return r.text();
 }

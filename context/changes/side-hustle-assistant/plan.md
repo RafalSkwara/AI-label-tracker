@@ -238,6 +238,8 @@ Connect channels through OAuth and run a daily cron that stores per-video and pe
 
 New name in the app, the PWA and the infrastructure; the old URL redirects. Done before push so push subscriptions live on the final origin.
 
+**Constraint from Phase 3:** the worker `scheduled` handler calls itself through `openNext.fetch` on the fake host `cron.internal`. The old-host redirect (redirect-worker) is a separate worker, so it is unaffected, but no redirect rule inside the main worker may catch `cron.internal`, or the cron would get a 301.
+
 ### Changes Required:
 
 #### 1. Name in the app
@@ -451,6 +453,7 @@ Delegated to the agent per Rafał's working rules (non-UI decisions are the agen
 | Phase 3 UI | A "YouTube" section on Dziś between alerts and gates, one card per `yt_channel`/`both` project: status line (niepołączony / połączony + last sync / błąd / wymagane ponowne połączenie / czekam na pierwszy raport CTR), "Połącz YouTube" or "Połącz ponownie" and "Synchronizuj teraz". The Google redirect result (`?yt=`) shows one toast and is removed from the URL. Public `/privacy` page (PL + EN, no e-mail) for the OAuth consent screen |
 | Phase 3 tooling | `vitest@3` (dev); `npm ci` was needed once because `npm i` failed on the old node_modules tree (arborist `edgesOut` bug). ESLint now ignores `.open-next/**` and `.wrangler/**` (build output made lint report ~10k problems) |
 | Phase 3 fixtures | `tests/fixtures/*` are hand-written to the documented formats (no OAuth token was available to capture a real call). **Unverified assumptions to check on the first real sync:** `video_thumbnail_impressions_ctr` is a fraction (0.05 = 5%) and is stored ×100; Analytics returns `day,video` rows for the `filters=video==` query without extra paging |
+| Phase 3 review F1-F8 | F1: weekly rows only for weeks fully inside the Analytics window (`toWeeks(rows, firstMondayOnOrAfter(windowStart))`), Reach-only weeks dropped, and weeks without Reach data are upserted without `impressions`/`ctr_pct` so a manual Studio value is never nulled. F2: `mapReach` sums lines per (video, date), CTR impression-weighted. F3: `scheduled` logs a non-ok cron status, the callback logs the error message only; `yt=no-channel` / `no-refresh-token` with Polish toasts. F4: `AbortSignal.timeout` 20 s on Google calls, 60 s on report downloads. F5: left open, fixtures to be replaced after the first real sync (3.8 stays open). F6: the post-connect sync runs in `ctx.waitUntil` after the redirect. F7: random nonce in an `HttpOnly; Secure; SameSite=Lax` cookie (`yt_nonce`, path `/api/yt`, 10 min) and in the signed state, compared in the callback. F8: reconnect is a `.btn` (44 px), errors mapped to Polish (`syncErrorPl`) with the raw text only in a detail line on the card |
 | F10 small fixes | All applied; synced weeks keep earning XP; t23/t24 kept, alerts suppressed |
 
 ## Progress

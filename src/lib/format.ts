@@ -18,3 +18,11 @@ export const num = (v: unknown): number | null =>
 /** Timestamp (ISO, UTC) shown in Warsaw local time, e.g. "26.10, 07:05" */
 export const localDateTime = (t: string) =>
   new Intl.DateTimeFormat("pl-PL", { timeZone: "Europe/Warsaw", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }).format(new Date(t));
+
+/** Polish text for the common sync errors; the raw text is shown only as a detail line */
+export const syncErrorPl = (raw: string) =>
+  /invalid_grant/.test(raw) ? "Wymagane ponowne połączenie konta YouTube"
+  : /different channel/i.test(raw) ? "Zapisane konto należy do innego kanału niż projekt"
+  : /quota|rateLimit|too many/i.test(raw) ? "Przekroczony limit zapytań YouTube, spróbuj później"
+  : /timeout|timed out|abort|fetch failed|network/i.test(raw) ? "Brak odpowiedzi od YouTube, spróbuj ponownie"
+  : "Synchronizacja nie powiodła się";

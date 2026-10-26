@@ -1,4 +1,4 @@
-import { localDateTime, nf } from "./format";
+import { localDateTime, nf, syncErrorPl } from "./format";
 import type { Data, Gate, GateRule } from "./types";
 
 export type Alert = {
@@ -212,8 +212,7 @@ export function alerts(d: Data, today: string, nowMs: number = Date.now()): Aler
   for (const i of d.integrations) {
     const name = d.projects.find((p) => p.id === i.project_id)?.name ?? "YouTube";
     if (i.last_error) {
-      const reconnect = /invalid_grant/.test(i.last_error);
-      out.push({ kind: "sync_failed", severity: "high", title: `Synchronizacja YouTube: ${name}`, detail: reconnect ? "Wymagane ponowne połączenie konta YouTube" : i.last_error, ref: i.project_id, projectId: i.project_id });
+      out.push({ kind: "sync_failed", severity: "high", title: `Synchronizacja YouTube: ${name}`, detail: syncErrorPl(i.last_error), ref: i.project_id, projectId: i.project_id });
     } else if (i.last_sync_at && nowMs - Date.parse(i.last_sync_at) > HOURS_36) {
       out.push({ kind: "sync_failed", severity: "high", title: `Synchronizacja YouTube: ${name}`, detail: `Ostatnia udana synchronizacja ${localDateTime(i.last_sync_at)} (ponad 36 h temu)`, ref: i.project_id, projectId: i.project_id });
     }
