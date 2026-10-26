@@ -426,6 +426,9 @@ Delegated to the agent per Rafał's working rules (non-UI decisions are the agen
 | F7 invisible failure | `sync_failed` alert + `Data.integrations` |
 | F8 default tab | Always start on Dziś; saved tab → `sessionStorage` |
 | F9 rename | Fix A: rename becomes phase 4 (before push); step 0 URL allow-lists; query kept |
+| Phase 1 `v_video_recent` shape | One row per `(project_id, yt_video_id)` with 35-day sums (`views, watch_minutes, subs_net, impressions, clicks`) and a `weeks` jsonb array of per-week totals (Monday weeks); `clicks = Σ impressions × ctr / 100` so CTR can be impression-weighted later |
+| Phase 1 task→project mapping | Elektronika: t07, t25, t26. Slowfall: t03, t08–t11, t15, t16, t18–t24. Shared (null): t01, t02, t04–t06, t13, t14, t17 (account, tooling, legal) |
+| Phase 1 Sheet | `Channel` picker field renamed `project` ("Projekt"); added to tasks and subs forms as optional; project chip on task rows, cost rows and subscription cards |
 | F10 small fixes | All applied; synced weeks keep earning XP; t23/t24 kept, alerts suppressed |
 
 ## Progress
@@ -436,10 +439,10 @@ Delegated to the agent per Rafał's working rules (non-UI decisions are the agen
 
 #### Automated
 
-- [ ] 1.1 Migration applies cleanly, projects = 3, gates = 2
-- [ ] 1.2 Type checking passes
-- [ ] 1.3 Linting passes
-- [ ] 1.4 OpenNext build passes
+- [ ] 1.1 Migration applies cleanly, projects = 3, gates = 2 — migration written (`supabase/migrations/20261026120000_projects.sql`), not applied (orchestrator applies)
+- [x] 1.2 Type checking passes — b4c650a
+- [x] 1.3 Linting passes — b4c650a
+- [x] 1.4 OpenNext build passes — b4c650a
 
 #### Manual
 
