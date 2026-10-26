@@ -29,7 +29,9 @@ const diffDays = (a: string, b: string) => Math.round((ms(a) - ms(b)) / DAY);
 const mondayOf = (d: string) => addDays(d, -((new Date(ms(d)).getUTCDay() + 6) % 7));
 const dmy = (d: string) => d.slice(0, 10).split("-").reverse().join(".");
 const pct1 = (n: number) => nf(1).format(n) + "%";
-const when = (n: number) => (n === 0 ? "dziś" : n === 1 ? "jutro" : n < 0 ? `${-n} ${n === -1 ? "dzień" : "dni"} temu` : `za ${n} dni`);
+/** "dziś" / "jutro" / "za 5 dni" / "3 dni temu": the one day phrase used by alerts and gate cards */
+export const when = (n: number) =>
+  n === 0 ? "dziś" : n === 1 ? "jutro" : n === -1 ? "wczoraj" : n < 0 ? `${-n} dni temu` : `za ${n} dni`;
 
 /**
  * Week starts (Mondays) of the `n` most recent complete weeks, oldest first.
@@ -42,18 +44,32 @@ export function completeWeeks(today: string, n: number): string[] {
   return Array.from({ length: n }, (_, i) => addDays(ws, -7 * (n - 1 - i)));
 }
 
+/** A manually entered week has no report lag: complete once its Sunday is before today */
+const latestManualWeek = (today: string) => {
+  const ws = mondayOf(addDays(today, -1));
+  return addDays(ws, 6) < today ? ws : addDays(ws, -7);
+};
+
+type Series = Map<string, { v: number; manual: boolean }>;
+
+/** Last complete week of a series: the newest manual week if one is entered, else the lagged last complete week */
+function anchorWeek(s: Series, today: string): string {
+  const m = latestManualWeek(today);
+  return s.get(m)?.manual ? m : completeWeeks(today, 1)[0];
+}
+
 /** v_video_recent covers `date >= current_date - 35`, so its oldest week can be cut; such a week is not trusted */
 const videoWeekOk = (ws: string, today: string) => ws >= addDays(today, -35);
 
 const val = (v: unknown): number | null => (v == null || v === "" || isNaN(Number(v)) ? null : Number(v));
 
 /** Per-week project total: manual or synced `weekly_stats` first, per-video sums fill the weeks it lacks */
-function projectWeeks(d: Data, projectId: string, metric: "impressions" | "hours", today: string): Map<string, number> {
-  const m = new Map<string, number>();
+function projectWeeks(d: Data, projectId: string, metric: "impressions" | "hours", today: string): Series {
+  const m: Series = new Map();
   for (const w of d.weeks) {
     if (w.project_id !== projectId) continue;
     const v = val(metric === "hours" ? w.watch_hours : w.impressions);
-    if (v != null) m.set(w.week_start, v);
+    if (v != null) m.set(w.week_start, { v, manual: w.source === "manual" });
   }
   const fromVideos = new Map<string, number>();
   for (const v of d.videos) {
@@ -64,15 +80,15 @@ function projectWeeks(d: Data, projectId: string, metric: "impressions" | "hours
       fromVideos.set(w.week_start, (fromVideos.get(w.week_start) ?? 0) + x);
     }
   }
-  for (const [k, x] of fromVideos) if (!m.has(k)) m.set(k, x);
+  for (const [k, x] of fromVideos) if (!m.has(k)) m.set(k, { v: x, manual: false });
   return m;
 }
 
 /** Impression change between the last two complete weeks, in percent; null when either week is missing */
 function impressionsWow(d: Data, projectId: string, today: string): number | null {
-  const [prevW, lastW] = completeWeeks(today, 2);
   const s = projectWeeks(d, projectId, "impressions", today);
-  const a = s.get(prevW), b = s.get(lastW);
+  const lastW = anchorWeek(s, today), prevW = addDays(lastW, -7);
+  const a = s.get(prevW)?.v, b = s.get(lastW)?.v;
   if (a == null || b == null || a <= 0) return null;
   return ((b - a) / a) * 100;
 }
@@ -80,6 +96,8 @@ function impressionsWow(d: Data, projectId: string, today: string): number | nul
 /** Impression-weighted CTR (Σ clicks / Σ impressions) of the 3 most recent live films with enough impressions */
 function ctrLast3(d: Data, projectId: string, today: string): { value: number; films: number } | null {
   const weeks = new Set(completeWeeks(today, 4).filter((w) => videoWeekOk(w, today)));
+  const wk = projectWeeks(d, projectId, "impressions", today);
+  const anchor = anchorWeek(wk, today), chWeeks = new Set([0, 7, 14, 21].map((n) => addDays(anchor, -n)));
   const films = d.items
     .filter((i) => i.project_id === projectId && i.kind === "film" && i.status === "live" && i.yt_video_id)
     .sort((a, b) => (b.publish_date ?? b.live_at ?? b.updated_at).localeCompare(a.publish_date ?? a.live_at ?? a.updated_at));
@@ -97,19 +115,19 @@ function ctrLast3(d: Data, projectId: string, today: string): { value: number; f
   let wi = 0, wc = 0;
   for (const w of d.weeks) {
     const i = val(w.impressions), c = val(w.ctr_pct);
-    if (w.project_id !== projectId || !weeks.has(w.week_start) || i == null || c == null) continue;
+    if (w.project_id !== projectId || !chWeeks.has(w.week_start) || i == null || c == null) continue;
     wi += i; wc += (i * c) / 100;
   }
   return wi >= MIN_IMPRESSIONS ? { value: (wc / wi) * 100, films: 0 } : null;
 }
 
 /** Watch hours of days [from, from+days) with each week spread evenly over its 7 days; null when a day has no data */
-function hoursInRange(series: Map<string, number>, from: string, days: number): number | null {
+function hoursInRange(series: Series, from: string, days: number): number | null {
   let sum = 0;
   for (let i = 0; i < days; i++) {
     const h = series.get(mondayOf(addDays(from, i)));
     if (h == null) return null;
-    sum += h / 7;
+    sum += h.v / 7;
   }
   return sum;
 }
@@ -128,13 +146,15 @@ function ruleStatus(r: GateRule, g: Gate, d: Data, today: string): RuleStatus {
   }
   // watch_hours_month_vs: the same day range of both months, up to the last complete day of the target month
   const monthEnd = fmt(Date.UTC(+r.month.slice(0, 4), +r.month.slice(5, 7), 0));
-  const lastDay = addDays(today, -3) < monthEnd ? addDays(today, -3) : monthEnd;
+  const s = projectWeeks(d, g.project_id, "hours", today);
+  // Data is weekly, so the range ends at the Sunday of the last complete week, never inside a partial one
+  const weekEnd = addDays(anchorWeek(s, today), 6);
+  const lastDay = weekEnd < monthEnd ? weekEnd : monthEnd;
   const first = r.month + "-01", vsFirst = r.vs + "-01";
   const vsLen = diffDays(fmt(Date.UTC(+r.vs.slice(0, 4), +r.vs.slice(5, 7), 0)), vsFirst) + 1;
   const days = Math.min(diffDays(lastDay, first) + 1, vsLen);
   const none = { value: null, target: null, ok: null, label: `Godziny ${r.month} vs ${r.vs}: brak danych` };
   if (days < 1) return none;
-  const s = projectWeeks(d, g.project_id, "hours", today);
   const a = hoursInRange(s, first, days), b = hoursInRange(s, vsFirst, days);
   if (a == null || b == null) return none;
   return { value: a, target: b, ok: a > b, label: `Godziny ${r.month} vs ${r.vs} (dni 1–${days}): ${nf(1).format(a)} h vs ${nf(1).format(b)} h` };
@@ -179,7 +199,7 @@ export function alerts(d: Data, today: string, nowMs: number = Date.now()): Aler
     const ctr = ((val(w.clicks) ?? 0) / imp) * 100;
     if (ctr >= CTR_MIN_PCT) continue;
     const item = d.items.find((i) => i.yt_video_id === v.yt_video_id);
-    out.push({ kind: "ctr_low", severity: "med", title: item?.title ?? "Film " + v.yt_video_id, detail: `CTR ${pct1(ctr)} (poniżej ${CTR_MIN_PCT}%) przy ${nf(0).format(imp)} wyświetleń w tygodniu od ${dmy(lastWeek)}`, ref: item?.id ?? v.yt_video_id, projectId: v.project_id });
+    out.push({ kind: "ctr_low", severity: "med", title: item?.title ?? "Film " + v.yt_video_id, detail: `CTR ${pct1(ctr)} (poniżej ${CTR_MIN_PCT}%) przy ${nf(0).format(imp)} wyświetleniach miniatur w tygodniu od ${dmy(lastWeek)}`, ref: item?.id ?? v.yt_video_id, projectId: v.project_id });
   }
 
   for (const p of d.projects) {

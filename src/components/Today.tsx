@@ -1,17 +1,15 @@
 "use client";
 
 import { dmy } from "@/lib/format";
-import { type Alert, alerts, gateRules, gateStatus } from "@/lib/rules";
+import { type Alert, gateRules, gateStatus, when } from "@/lib/rules";
 import type { Data } from "@/lib/types";
 
 const SEV = { high: "Pilne", med: "Wkrótce", low: "Info" } as const;
-const days = (n: number) => (n === 0 ? "dziś" : n < 0 ? `${-n} ${n === -1 ? "dzień" : "dni"} po terminie` : `za ${n} ${n === 1 ? "dzień" : "dni"}`);
 
 /** Alerts that open a record are tappable; the rest are informational */
 export const opensRecord = (a: Alert) => a.kind !== "gate" && a.kind !== "sync_failed";
 
-export default function Today({ data, today, onOpen }: { data: Data; today: string; onOpen: (a: Alert) => void }) {
-  const list = alerts(data, today);
+export default function Today({ data, today, list, onOpen }: { data: Data; today: string; list: Alert[]; onOpen: (a: Alert) => void }) {
   const pname = (id?: string) => data.projects.find((p) => p.id === id)?.name;
   return (
     <div className="today">
@@ -27,8 +25,8 @@ export default function Today({ data, today, onOpen }: { data: Data; today: stri
             <>
               <span className="sev">{SEV[a.severity]}</span>
               <span style={{ minWidth: 0 }}>
-                <div className="t">{a.title}</div>
-                <div className="d">{a.detail}{pname(a.projectId) ? " · " + pname(a.projectId) : ""}</div>
+                <span className="t">{a.title}</span>
+                <span className="d">{a.detail}{pname(a.projectId) ? " · " + pname(a.projectId) : ""}</span>
               </span>
             </>
           );
@@ -49,7 +47,7 @@ export default function Today({ data, today, onOpen }: { data: Data; today: stri
               <div className="head">
                 <div style={{ minWidth: 0 }}>
                   <h3>{g.title}</h3>
-                  <p className="sub">{pname(g.project_id)} · do {dmy(g.due)} ({days(s.daysLeft)})</p>
+                  <p className="sub">{pname(g.project_id)} · do {dmy(g.due)} ({when(s.daysLeft)})</p>
                 </div>
                 <span className={"pill " + state}>{s.ok === true ? "spełniona" : s.ok === false ? "niespełniona" : "brak danych"}</span>
               </div>

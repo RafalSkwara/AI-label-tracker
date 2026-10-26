@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { archiveRow, loadAll, saveRow, saveSettings, setTaskDone } from "@/lib/data";
 import { daysTo, dfmt, dmy, inDays, nf, num, pln, today } from "@/lib/format";
 import { XP_PER_LEVEL, badges, costTotals, levelName, levelOf, monthly, streak, totalHours, totalSubs, trend, weeksAgg, xpTotal } from "@/lib/game";
@@ -31,7 +31,11 @@ export default function Tracker({ email }: { email: string }) {
   // Start tab: ?tab= from the URL, else the tab remembered for this session (reloads), else Dziś on every launch.
   const [tab, setTab] = useState<TabId>(() => {
     const ok = (s: string | null) => TABS.some((t) => t.id === s);
-    try { const q = new URLSearchParams(window.location.search).get("tab"); if (ok(q)) return q as TabId; } catch {}
+    try {
+      const u = new URL(window.location.href), q = u.searchParams.get("tab");
+      if (q != null) { u.searchParams.delete("tab"); history.replaceState(null, "", u.pathname + u.search + u.hash); } // keep other params, e.g. yt
+      if (ok(q)) return q as TabId;
+    } catch {}
     try { const s = sessionStorage.getItem("tab"); if (ok(s)) return s as TabId; } catch {}
     return "dzis";
   });
@@ -90,6 +94,8 @@ export default function Tracker({ email }: { email: string }) {
     else if (a.kind === "ctr_low") { const i = find(data.items); if (i) setEditing({ coll: "items", rec: i }); else pickTab("tygodnie"); }
     else if (a.kind === "impressions_drop") pickTab("tygodnie");
   }
+
+  const alertList = useMemo(() => (data ? alerts(data, today()) : []), [data]);
 
   const xp = data ? xpTotal(data) : 0, lvl = levelOf(xp), into = xp - lvl * XP_PER_LEVEL;
 
@@ -155,13 +161,13 @@ export default function Tracker({ email }: { email: string }) {
             {TABS.map((t) => (
               <button key={t.id} role="tab" id={"tab-" + t.id} aria-selected={tab === t.id} onClick={() => pickTab(t.id)}>
                 {t.name}
-                <span className="count">{t.coll === null ? alerts(data, today()).filter((a) => a.severity !== "low").length : t.coll === "tasks" ? data.tasks.filter((x) => !x.done).length : data[t.coll].length}</span>
+                <span className="count">{t.coll === null ? alertList.filter((a) => a.severity !== "low").length : t.coll === "tasks" ? data.tasks.filter((x) => !x.done).length : data[t.coll].length}</span>
               </button>
             ))}
           </nav>
 
           <main className="panel" role="tabpanel" aria-labelledby={"tab-" + tab}>
-            {tab === "dzis" && <Today data={data} today={today()} onOpen={openAlert} />}
+            {tab === "dzis" && <Today data={data} today={today()} list={alertList} onOpen={openAlert} />}
             {tab === "zadania" && <TasksPanel data={data} onAdd={() => setEditing({ coll: "tasks", rec: null })} onEdit={(t) => setEditing({ coll: "tasks", rec: t })}
               onToggle={(t, done) => {
                 setData({ ...data, tasks: data.tasks.map((x) => (x.id === t.id ? { ...x, done } : x)) });

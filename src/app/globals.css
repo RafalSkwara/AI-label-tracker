@@ -190,6 +190,7 @@ body{padding-top:max(20px, env(safe-area-inset-top, 0px));padding-bottom:max(48p
 button.alert{cursor:pointer}
 button.alert:hover{border-color:var(--muted)}
 .alert.high{border-left-color:var(--bad)} .alert.med{border-left-color:var(--warn)} .alert.low{border-left-color:var(--muted)}
+.alert .t,.alert .d{display:block}
 .alert .t{font-weight:500;overflow-wrap:anywhere}
 .alert .d{color:var(--muted);font-size:.85rem}
 .alert .sev{font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;font-weight:600;padding-top:2px}

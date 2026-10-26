@@ -441,6 +441,7 @@ Delegated to the agent per Rafał's working rules (non-UI decisions are the agen
 | Phase 2 `sync_failed` | `Data.integrations` is not typed yet; `alerts` reads it through a local cast and produces nothing when absent. Staleness uses a clock (`alerts(d, today, nowMs = Date.now())`) because "36 h" cannot be derived from a date string. Phase 3 should type `Data.integrations` and drop the cast |
 | Phase 2 alert edges | Renewal alert only for `0..7` days ahead (overdue renewals are not alerted); `ctr_low` is per video from `v_video_recent` (last complete week, ≥ 100 impressions); `gate` alert also fires after the due date while `ok=false`; `Item` type gained `yt_video_id` (column already exists) |
 | Phase 2 tabs | Start tab = `?tab=` → `sessionStorage` (reloads in a session) → `dzis`; the old `localStorage` key is no longer read. Dziś tab count = high + med alerts. Tapping an alert opens the task / subscription / film in the edit sheet; gate and sync alerts are not tappable |
+| Phase 2 review F1–F8 | F1: the month comparison ends at the Sunday of the last complete week. F2 (Fix A): a `weekly_stats` row with `source = 'manual'` is complete once its Sunday is before today; `yt_api` rows and `v_video_recent` keep the 3-day lag. F3: `?tab=` is removed from the URL after reading (other params kept). F4: `videoWeekOk` applies only to per-video weeks. F6: "wyświetleniach miniatur", one shared `when()` day phrase. F7/F8: spans inside alert buttons, `alerts()` computed once in Tracker. The `med` badge name is pending Rafał |
 | F10 small fixes | All applied; synced weeks keep earning XP; t23/t24 kept, alerts suppressed |
 
 ## Progress
@@ -472,10 +473,12 @@ Delegated to the agent per Rafał's working rules (non-UI decisions are the agen
 
 #### Manual
 
-- [ ] 2.4 Dziś opens on every launch and shows overdue tasks and renewals
+- [ ] 2.4 Dziś opens on every launch and shows overdue tasks and renewals (cold start: close the app from the app switcher first)
 - [ ] 2.5 Gate cards: no data, then a value after a manual week
 
 ### Phase 3: YouTube sync
+
+> Notes from the Phase 2 review: widen `v_video_recent` to 42 days so 4 complete weeks always fit (F4); type `Data.integrations`, drop the cast in `rules.ts` and format `last_sync_at` in local time, Europe/Warsaw (F5a).
 
 #### Automated
 
