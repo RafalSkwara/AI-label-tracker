@@ -466,9 +466,9 @@ Delegated to the agent per Rafał's working rules (non-UI decisions are the agen
 
 #### Automated
 
-- [x] 2.1 Type checking passes
-- [x] 2.2 Linting passes
-- [x] 2.3 OpenNext build passes
+- [x] 2.1 Type checking passes — 2440466
+- [x] 2.2 Linting passes — 2440466
+- [x] 2.3 OpenNext build passes — 2440466
 
 #### Manual
 
