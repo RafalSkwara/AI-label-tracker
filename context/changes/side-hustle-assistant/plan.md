@@ -491,11 +491,11 @@ Delegated to the agent per Rafał's working rules (non-UI decisions are the agen
 
 #### Automated
 
-- [x] 3.1 Integrations migration, token unreadable for authenticated — written, not applied (orchestrator applies)
-- [x] 3.2 YouTube mapping integration test passes
-- [x] 3.3 Type checking passes
-- [x] 3.4 Linting passes
-- [x] 3.5 OpenNext build passes
+- [x] 3.1 Integrations migration, token unreadable for authenticated — c5e0618 — written, not applied (orchestrator applies)
+- [x] 3.2 YouTube mapping integration test passes — c5e0618
+- [x] 3.3 Type checking passes — c5e0618
+- [x] 3.4 Linting passes — c5e0618
+- [x] 3.5 OpenNext build passes — c5e0618
 
 #### Manual
 
