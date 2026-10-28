@@ -63,9 +63,16 @@ describe("YouTube mapping", () => {
 
   it("maps search terms and drops blank terms", () => {
     expect(mapSearchTerms(fixture("yt-search-terms"))).toEqual([
-      { term: "rain sounds for sleep", views: 22 }, { term: "slow fall scenes", views: 14 }, { term: "autumn ambience", views: 9 },
+      { term: "rain sounds for sleep", views: 22 }, { term: "slow fall scenes", views: 20 }, { term: "autumn ambience", views: 9 },
     ]);
+    // "slow fall scenes " (trailing space) merges into "slow fall scenes": 14 + 6
     expect(mapSearchTerms({ columnHeaders: [{ name: "insightTrafficSourceDetail" }, { name: "views" }], rows: null })).toEqual([]);
+  });
+
+  it("finds traffic columns by header name when the order differs, and throws when the dimension is missing", () => {
+    const reordered = { columnHeaders: [{ name: "estimatedMinutesWatched" }, { name: "insightTrafficSourceType" }, { name: "views" }], rows: [[40, "YT_SEARCH", 7]] };
+    expect(mapTraffic(reordered)).toEqual([{ source_type: "YT_SEARCH", views: 7, watch_minutes: 40 }]);
+    expect(() => mapTraffic({ columnHeaders: [{ name: "views" }], rows: [[1]] })).toThrow(/insightTrafficSourceType/);
   });
 
   it("maps public counters: strings to numbers, hidden likes/comments to null, videos without statistics skipped", () => {

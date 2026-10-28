@@ -71,7 +71,7 @@ export type Upload = { id: string; publishedAt: string };
 export const uploadsPlaylistOf = (channelId: string) => (channelId.startsWith("UC") ? "UU" + channelId.slice(2) : null);
 
 /** Uploads playlist entries, newest first (up to 3 pages of 50) */
-export async function uploads(at: string, playlist: string): Promise<Upload[]> {
+export async function uploads(at: string, playlist: string, notBefore?: number): Promise<Upload[]> {
   const out: Upload[] = [];
   let page: string | undefined;
   for (let i = 0; i < 3; i++) {
@@ -79,7 +79,8 @@ export async function uploads(at: string, playlist: string): Promise<Upload[]> {
       "https://www.googleapis.com/youtube/v3/playlistItems?" + qs({ part: "contentDetails", playlistId: playlist, maxResults: 50, pageToken: page }), at, "playlistItems.list");
     out.push(...(j.items ?? []).map((x) => ({ id: x.contentDetails.videoId, publishedAt: x.contentDetails.videoPublishedAt ?? "" })));
     page = j.nextPageToken;
-    if (!page) break;
+    // Newest first: once an item is older than the cutoff, later pages are older still
+    if (!page || (notBefore != null && out.some((u) => u.publishedAt && Date.parse(u.publishedAt) < notBefore))) break;
   }
   return out;
 }

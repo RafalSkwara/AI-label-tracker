@@ -535,6 +535,7 @@ Delegated to the agent per Rafał's working rules (non-UI decisions are the agen
 | Phase 7 UI | "Ostatnie 24 h" section on Dziś (after YouTube): per project the total, the films published in the last 7 days (`content_items.publish_date`), and a collapsed `<details>` per video with traffic-source shares and the top 10 search terms. Groups: Sugerowane = `RELATED_VIDEO`, Wyszukiwarka = `YT_SEARCH`, Przeglądanie = `SUBSCRIBER`, Zewnętrzne = `EXT_URL`, `NO_LINK_EMBEDDED`, `NO_LINK_OTHER`, Playlisty = `PLAYLIST`, Inne = the rest (assumption: Studio "Channel pages" lands in Inne) |
 | Phase 7 migration | `20261028100000_traffic_and_snapshots.sql`: three new tables, one new view, owner-read RLS, `authenticated` has `select` only. Strictly additive; written, not applied. **Must be applied before the PR is merged**: `loadAll` now reads the three tables and `v_views_24h`, and the live app would show a load error without them |
 | Phase 7 fixtures | `yt-traffic.json`, `yt-search-terms.json`, `yt-stats.json` are hand-written from the documented response shapes (no OAuth token to capture real calls). Assumptions to check on the first real daily and hourly runs: the traffic query returns one row per source type with `views, estimatedMinutesWatched`; search-term rows are `[term, views]`; hidden like/comment counts are absent from `statistics`; `videoPublishedAt` is present on `playlistItems` (otherwise no video counts as recent). Manual rows 7.6 and 7.7 stay open |
+| Phase 7 review F1-F9 | F1: hourly failures logged, "stan z" when the newest snapshot is over 3 h old. F2: explicit cron map, unknown kind rejected (400). F3: search terms aggregated by trimmed term. F4: traffic errors continue per video, own Polish message, no reconnect emphasis. F5/F6: span label whenever not 24 h (largest span), only the newest snapshot time summed. F7: Dziś breakdown limited to films of the last 7 days (the full per-video list still has no project view; deferred). F8: playlist paging stops at the 90-day cutoff, two more mapping tests. F9: 7.1 open until the migration is applied |
 
 ## Progress
 
@@ -633,7 +634,7 @@ Delegated to the agent per Rafał's working rules (non-UI decisions are the agen
 
 #### Automated
 
-- [x] 7.1 Traffic and snapshot migration applies cleanly, authenticated read-only — written, not applied (orchestrator applies) — f199017
+- [ ] 7.1 Traffic and snapshot migration applies cleanly, authenticated read-only — written, not applied (orchestrator applies) — f199017
 - [x] 7.2 YouTube mapping integration test passes (traffic, search terms, stats) — f199017
 - [x] 7.3 Type checking passes — f199017
 - [x] 7.4 Linting passes — f199017

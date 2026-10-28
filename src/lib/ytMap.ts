@@ -148,9 +148,13 @@ export function mapTraffic(json: AnalyticsJson): TrafficRow[] {
 
 /** Analytics `dimensions=insightTrafficSourceDetail` (type YT_SEARCH) → search terms with views, empty terms skipped */
 export function mapSearchTerms(json: AnalyticsJson): SearchTerm[] {
-  return table(json, ["insightTrafficSourceDetail"], ["views"])
-    .map((r) => ({ term: r.dims[0].trim(), views: r.metrics[0] }))
-    .filter((r) => r.term);
+  // Terms that differ only in surrounding whitespace are one term (one upsert must not hit a key twice)
+  const sum = new Map<string, number>();
+  for (const r of table(json, ["insightTrafficSourceDetail"], ["views"])) {
+    const term = r.dims[0].trim();
+    if (term) sum.set(term, (sum.get(term) ?? 0) + r.metrics[0]);
+  }
+  return [...sum].map(([term, views]) => ({ term, views })).sort((a, b) => b.views - a.views);
 }
 
 /** Data API `videos.list(part=statistics)` → counters per video. Hidden likes/comments come back absent → null. */

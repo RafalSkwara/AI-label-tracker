@@ -75,16 +75,23 @@ async function syncTraffic(db: SupabaseClient, pid: string, at: string, vids: g.
   if (!vids.length) return;
   const periodEnd = analytics.reduce((m, r) => (r.date > m ? r.date : m), "") || fallbackEnd;
   const periodStart = iso(Date.parse(periodEnd) - (WINDOW_DAYS - 1) * DAY);
+  let firstError: Error | undefined;
   for (const v of vids) {
-    const traffic = mapTraffic(await g.trafficSources(at, v.id, periodStart, periodEnd));
-    await upsertChunks(db, "video_traffic", traffic.map((r) => ({ project_id: pid, yt_video_id: v.id, period_end: periodEnd, ...r })), "yt_video_id,period_end,source_type");
-    must(await db.from("video_traffic").delete().eq("yt_video_id", v.id).lt("period_end", periodEnd));
-    // Search terms only exist when YouTube search sent views; the extra call is skipped otherwise
-    const terms = traffic.some((r) => r.source_type === "YT_SEARCH" && r.views > 0)
-      ? mapSearchTerms(await g.searchTerms(at, v.id, periodStart, periodEnd)) : [];
-    must(await db.from("video_search_terms").delete().eq("yt_video_id", v.id));
-    await upsertChunks(db, "video_search_terms", terms.map((t) => ({ project_id: pid, yt_video_id: v.id, period_end: periodEnd, ...t })), "yt_video_id,period_end,term");
+    try { await syncVideoTraffic(db, pid, at, v, periodStart, periodEnd); }
+    catch (e) { firstError ??= e as Error; }
   }
+  if (firstError) throw firstError;
+}
+
+async function syncVideoTraffic(db: SupabaseClient, pid: string, at: string, v: g.Upload, periodStart: string, periodEnd: string) {
+  const traffic = mapTraffic(await g.trafficSources(at, v.id, periodStart, periodEnd));
+  await upsertChunks(db, "video_traffic", traffic.map((r) => ({ project_id: pid, yt_video_id: v.id, period_end: periodEnd, ...r })), "yt_video_id,period_end,source_type");
+  must(await db.from("video_traffic").delete().eq("yt_video_id", v.id).lt("period_end", periodEnd));
+  // Search terms only exist when YouTube search sent views; the extra call is skipped otherwise
+  const terms = traffic.some((r) => r.source_type === "YT_SEARCH" && r.views > 0)
+    ? mapSearchTerms(await g.searchTerms(at, v.id, periodStart, periodEnd)) : [];
+  must(await db.from("video_search_terms").delete().eq("yt_video_id", v.id));
+  await upsertChunks(db, "video_search_terms", terms.map((t) => ({ project_id: pid, yt_video_id: v.id, period_end: periodEnd, ...t })), "yt_video_id,period_end,term");
 }
 
 export async function syncIntegration(db: SupabaseClient, row: Row, now = Date.now()): Promise<SyncResult> {
@@ -160,7 +167,7 @@ export async function snapshotIntegration(db: SupabaseClient, row: SnapshotRow, 
     const at = await g.refreshAccess(row.refresh_token);
     // The uploads playlist id follows from the channel id, which saves a channels.list call
     const playlist = (row.yt_channel_id && g.uploadsPlaylistOf(row.yt_channel_id)) || (await g.myChannel(at)).uploads;
-    const ids = recent(await g.uploads(at, playlist), now).map((v) => v.id);
+    const ids = recent(await g.uploads(at, playlist, now - RECENT_DAYS * DAY), now).map((v) => v.id);
     const takenAt = new Date(Math.floor(now / 36e5) * 36e5).toISOString();
     const stats = [];
     for (let i = 0; i < ids.length; i += 50) stats.push(...mapStats(await g.videoStatistics(at, ids.slice(i, i + 50))));
@@ -176,6 +183,10 @@ export async function snapshotIntegration(db: SupabaseClient, row: SnapshotRow, 
 export async function snapshotAll(db: SupabaseClient): Promise<SnapshotResult[]> {
   const rows = must(await db.from("integrations").select("project_id,yt_channel_id,refresh_token").eq("provider", "youtube")) as SnapshotRow[];
   const out: SnapshotResult[] = [];
-  for (const r of rows) out.push(await snapshotIntegration(db, r));
+  for (const r of rows) {
+    const res = await snapshotIntegration(db, r);
+    if (!res.ok) console.error("hourly snapshot failed:", res.projectId, res.error);
+    out.push(res);
+  }
   return out;
 }
