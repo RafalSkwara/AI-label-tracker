@@ -526,6 +526,15 @@ Delegated to the agent per Rafał's working rules (non-UI decisions are the agen
 | Phase 3 fixtures | `tests/fixtures/*` are hand-written to the documented formats (no OAuth token was available to capture a real call). **Unverified assumptions to check on the first real sync:** `video_thumbnail_impressions_ctr` is a fraction (0.05 = 5%) and is stored ×100; Analytics returns `day,video` rows for the `filters=video==` query without extra paging |
 | Phase 3 review F1-F8 | F1: weekly rows only for weeks fully inside the Analytics window (`toWeeks(rows, firstMondayOnOrAfter(windowStart))`), Reach-only weeks dropped, and weeks without Reach data are upserted without `impressions`/`ctr_pct` so a manual Studio value is never nulled. F2: `mapReach` sums lines per (video, date), CTR impression-weighted. F3: `scheduled` logs a non-ok cron status, the callback logs the error message only; `yt=no-channel` / `no-refresh-token` with Polish toasts. F4: `AbortSignal.timeout` 20 s on Google calls, 60 s on report downloads. F5: left open, fixtures to be replaced after the first real sync (3.8 stays open). F6: the post-connect sync runs in `ctx.waitUntil` after the redirect. F7: random nonce in an `HttpOnly; Secure; SameSite=Lax` cookie (`yt_nonce`, path `/api/yt`, 10 min) and in the signed state, compared in the callback. F8: reconnect is a `.btn` (44 px), errors mapped to Polish (`syncErrorPl`) with the raw text only in a detail line on the card |
 | F10 small fixes | All applied; synced weeks keep earning XP; t23/t24 kept, alerts suppressed |
+| Phase 7 traffic query shape | Per-video calls behind `g.trafficSources` / `g.searchTerms` (`google.ts`). The API docs do accept `filters=video==a,b` (≤ 500 ids), but `video` is not a dimension of the traffic-source report, so a list would sum the videos into one row and lose the per-video shares we need. One call per channel is therefore not possible; switching later only means changing that helper. Search terms are queried only when `YT_SEARCH` has views |
+| Phase 7 subrequest budget | Workers Paid (10,000 subrequests, 30 s CPU). `MAX_TRAFFIC_VIDEOS = 40` per integration per daily run, newest first among uploads of the last 90 days (80 Analytics calls; with up to 40 Reporting downloads and the Supabase writes still a few hundred per integration, far below the limit). Lower to 8 on Workers Free. Videos beyond the cap are not covered (no rotation; a channel has a handful of films today) |
+| Phase 7 hourly run | Per integration: token refresh, uploads playlist derived from the channel id (`UC…` → `UU…`, saves `channels.list`; falls back to `channels.list`), `playlistItems` (≤ 3 pages) for publish dates, `videos.list` in chunks of 50. `taken_at` = current hour, upserted, so a retry is idempotent. Rows older than 14 days are removed through the service-role client. Hourly errors appear in the cron response only and do not touch `last_error` (that stays the daily sync status) |
+| Phase 7 cron routing | `worker.ts` sends `x-cron-kind: hourly` when `controller.cron` equals `30 * * * *` (constant must match `wrangler.jsonc`), otherwise `daily`; `/api/cron` treats a missing header as daily |
+| Phase 7 daily traffic | Runs after the core sync; window = 28 days ending at the latest day Analytics returned (`period_end`). A traffic failure keeps the data already saved and sets `last_error = "Traffic: …"` (result `ok:false`). Older `period_end` rows of a video are removed after each write and search terms are replaced per video, so only the current window remains |
+| Phase 7 24 h counter | New view `v_views_24h`: latest snapshot per video minus the newest snapshot at least 24 h older; while less than 24 h of history exists the oldest snapshot is used and the card says "dane z ostatnich N h". This is what lets Dziś show a number after two hourly runs (manual row 7.7) |
+| Phase 7 UI | "Ostatnie 24 h" section on Dziś (after YouTube): per project the total, the films published in the last 7 days (`content_items.publish_date`), and a collapsed `<details>` per video with traffic-source shares and the top 10 search terms. Groups: Sugerowane = `RELATED_VIDEO`, Wyszukiwarka = `YT_SEARCH`, Przeglądanie = `SUBSCRIBER`, Zewnętrzne = `EXT_URL`, `NO_LINK_EMBEDDED`, `NO_LINK_OTHER`, Playlisty = `PLAYLIST`, Inne = the rest (assumption: Studio "Channel pages" lands in Inne) |
+| Phase 7 migration | `20261028100000_traffic_and_snapshots.sql`: three new tables, one new view, owner-read RLS, `authenticated` has `select` only. Strictly additive; written, not applied. **Must be applied before the PR is merged**: `loadAll` now reads the three tables and `v_views_24h`, and the live app would show a load error without them |
+| Phase 7 fixtures | `yt-traffic.json`, `yt-search-terms.json`, `yt-stats.json` are hand-written from the documented response shapes (no OAuth token to capture real calls). Assumptions to check on the first real daily and hourly runs: the traffic query returns one row per source type with `views, estimatedMinutesWatched`; search-term rows are `[term, views]`; hidden like/comment counts are absent from `statistics`; `videoPublishedAt` is present on `playlistItems` (otherwise no video counts as recent). Manual rows 7.6 and 7.7 stay open |
 
 ## Progress
 
@@ -573,7 +582,7 @@ Delegated to the agent per Rafał's working rules (non-UI decisions are the agen
 
 #### Manual
 
-- [ ] 3.6 OAuth client in Google Cloud, secrets in CF, Slowfall connected
+- [x] 3.6 OAuth client in Google Cloud, secrets in CF, Slowfall connected — confirmed: Slowfall Scenes and Contents May Vary connected 2026-10-26
 - [ ] 3.7 [API] weeks match Studio (±5%)
 - [ ] 3.8 Per-video CTR and the CTR < 3% alert match Studio
 
@@ -624,11 +633,11 @@ Delegated to the agent per Rafał's working rules (non-UI decisions are the agen
 
 #### Automated
 
-- [ ] 7.1 Traffic and snapshot migration applies cleanly, authenticated read-only
-- [ ] 7.2 YouTube mapping integration test passes (traffic, search terms, stats)
-- [ ] 7.3 Type checking passes
-- [ ] 7.4 Linting passes
-- [ ] 7.5 OpenNext build passes
+- [x] 7.1 Traffic and snapshot migration applies cleanly, authenticated read-only — written, not applied (orchestrator applies) — f199017
+- [x] 7.2 YouTube mapping integration test passes (traffic, search terms, stats) — f199017
+- [x] 7.3 Type checking passes — f199017
+- [x] 7.4 Linting passes — f199017
+- [x] 7.5 OpenNext build passes — f199017
 
 #### Manual
 
