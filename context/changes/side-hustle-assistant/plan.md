@@ -536,6 +536,11 @@ Delegated to the agent per Rafał's working rules (non-UI decisions are the agen
 | Phase 7 migration | `20261028100000_traffic_and_snapshots.sql`: three new tables, one new view, owner-read RLS, `authenticated` has `select` only. Strictly additive; written, not applied. **Must be applied before the PR is merged**: `loadAll` now reads the three tables and `v_views_24h`, and the live app would show a load error without them |
 | Phase 7 fixtures | `yt-traffic.json`, `yt-search-terms.json`, `yt-stats.json` are hand-written from the documented response shapes (no OAuth token to capture real calls). Assumptions to check on the first real daily and hourly runs: the traffic query returns one row per source type with `views, estimatedMinutesWatched`; search-term rows are `[term, views]`; hidden like/comment counts are absent from `statistics`; `videoPublishedAt` is present on `playlistItems` (otherwise no video counts as recent). Manual rows 7.6 and 7.7 stay open |
 | Phase 7 review F1-F9 | F1: hourly failures logged, "stan z" when the newest snapshot is over 3 h old. F2: explicit cron map, unknown kind rejected (400). F3: search terms aggregated by trimmed term. F4: traffic errors continue per video, own Polish message, no reconnect emphasis. F5/F6: span label whenever not 24 h (largest span), only the newest snapshot time summed. F7: Dziś breakdown limited to films of the last 7 days (the full per-video list still has no project view; deferred). F8: playlist paging stops at the 90-day cutoff, two more mapping tests. F9: 7.1 open until the migration is applied |
+| Phase 6 export format | Assumed from DistroKid's documented Bank export: columns Reporting Date, Sale Month, Store, Artist, Title, ISRC, Quantity, Country of Sale, Earnings (USD) (real exports also carry UPC, Team Percentage, Song/Album, Songwriter Royalties Withheld). The file may be CSV or TSV (the delimiter is read from the header line: tab, comma or semicolon), with BOM and CRLF. Columns are found by header name (case and spacing ignored), so order and extra columns do not matter; required: Sale Month, Artist, Earnings (USD), otherwise the import stops with "Brakuje kolumn". `Sale Month` is normalised to the first of the month (accepts `2026-09`, `2026-09-01`, `09/2026`, `Sep 2026`); amounts accept `1,234.56` and `0,5`; negative amounts (adjustments) are kept. `Reporting Date` is only part of the hash, it is not stored. **Unverified until a real export is imported** (manual row 6.6) |
+| Phase 6 import hash | `import_hash` = SHA-256 of Reporting Date, month, store, artist, title, ISRC, quantity, country, earnings plus an occurrence number, so identical lines inside one file stay distinct while the same file always yields the same hashes. The hash does not include the project, so remapping an artist later does not re-import. Inserts use `ON CONFLICT (import_hash) DO NOTHING` (`upsert ignoreDuplicates`) in batches of 500 and count the really inserted rows ("Już w bazie" = the rest) |
+| Phase 6 skipped rows | "pominięto M" = rows of artists with no project whose `distrokid_artist` matches (case and spacing ignored) plus unreadable lines (bad month, quantity or amount); skipped artists are listed with counts. The UI also lists artist projects without `distrokid_artist` (Elektronika today); there is no project editor yet, so the name is set in the database |
+| Phase 6 migration | `20261028120000_royalties.sql`, strictly additive: table `royalties` (RLS on, `owner_all` for `authenticated`, nothing for `anon`) and view `v_royalties_month` (security invoker, totals per project, month and title, so the tab does not page through every store/country row; `authenticated` select only). Written, not applied. The tab reads it lazily, not through `loadAll`, so the live app is unaffected until the Muzyka tab is opened, but apply it before the merge |
+| Phase 6 fixture | `tests/fixtures/distrokid.csv` is hand-written to the documented format (no real export available): commas and doubled quotes in titles, one repeated line, one unknown artist |
 
 ## Progress
 
@@ -618,11 +623,11 @@ Delegated to the agent per Rafał's working rules (non-UI decisions are the agen
 
 #### Automated
 
-- [ ] 6.1 Royalties migration applies cleanly
-- [ ] 6.2 CSV parser integration test passes
-- [ ] 6.3 Type checking passes
-- [ ] 6.4 Linting passes
-- [ ] 6.5 OpenNext build passes
+- [x] 6.1 Royalties migration applies cleanly — de90339 — written, not applied (orchestrator applies)
+- [x] 6.2 CSV parser integration test passes — de90339
+- [x] 6.3 Type checking passes — de90339
+- [x] 6.4 Linting passes — de90339
+- [x] 6.5 OpenNext build passes — de90339
 
 #### Manual
 
