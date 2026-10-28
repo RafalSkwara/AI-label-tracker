@@ -85,7 +85,7 @@ export function tokenize(text: string, delim: string): string[][] {
         if (s[i + 1] === '"') { field += '"'; i += 2; continue; }
         q = false;
       } else field += ch;
-    } else if (ch === '"' && field === "") q = true;
+    } else if (ch === '"' && field.trim() === "") { q = true; field = ""; }
     else if (ch === delim) { row.push(field); field = ""; }
     else if (ch === "\n") endRow();
     else if (ch === "\r") { if (s[i + 1] === "\n") i++; endRow(); }
@@ -111,18 +111,40 @@ export function saleMonth(raw: string): string | null {
   return null;
 }
 
-/** "0.4821", "-0.02", "1,234.56", "0,5" -> number; empty or garbage -> null */
-export function money(raw: string): number | null {
+/**
+ * "0.4821", "-0.02", "1,234.56" -> number; empty or garbage -> null.
+ * The decimal mark is decided once per file (see `parseDistroKid`), never guessed per value:
+ * - decimal ".": "," is a thousands separator, only in real groups (1,234 / 12,345.6), so "0,5" and "0,123" are invalid;
+ * - decimal ",": (semicolon files, e.g. Polish Excel) "0,482" is 0.482; "." and spaces are thousands separators only in real groups.
+ */
+export function money(raw: string, decimal: "." | "," = "."): number | null {
   let s = raw.trim().replace(/^\$/, "");
   if (s === "") return null;
-  if (/^-?\d{1,3}(,\d{3})+(\.\d+)?$/.test(s)) s = s.replace(/,/g, "");
-  else if (/^-?\d+,\d+$/.test(s)) s = s.replace(",", ".");
+  if (decimal === ",") {
+    s = s.replace(/[\s ]/g, "");
+    if (/^-?[1-9]\d{0,2}(\.\d{3})+(,\d+)?$/.test(s)) s = s.replace(/\./g, "");
+    s = s.replace(",", ".");
+  } else if (/^-?[1-9]\d{0,2}(,\d{3})+(\.\d+)?$/.test(s)) s = s.replace(/,/g, "");
   return /^-?\d+(\.\d+)?([eE][-+]?\d+)?$/.test(s) ? Number(s) : null;
+}
+
+/** Reporting Date -> YYYY-MM-DD (so a file re-saved by a spreadsheet hashes the same); unparseable text is returned as is */
+export function reportingDate(raw: string): string {
+  const s = raw.trim();
+  const ymd = (y: string, m: number, d: number) => (m >= 1 && m <= 12 && d >= 1 && d <= 31 ? `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}` : null);
+  let m = /^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})(?:[T ].*)?$/.exec(s);
+  if (m) return ymd(m[1], +m[2], +m[3]) ?? s;
+  m = /^(\d{1,2})\.(\d{1,2})\.(\d{4})$/.exec(s); // 14.10.2026: day first
+  if (m) return ymd(m[3], +m[2], +m[1]) ?? s;
+  m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(s); // 10/14/2026: month first unless the first number cannot be a month
+  if (m) return (+m[1] > 12 ? ymd(m[3], +m[2], +m[1]) : ymd(m[3], +m[1], +m[2])) ?? s;
+  return s;
 }
 
 /** Parses the whole export; lines with an unreadable month, quantity or amount are counted in `invalid` */
 export function parseDistroKid(text: string): ParseResult {
-  const table = tokenize(text, detectDelimiter(text));
+  const delim = detectDelimiter(text), decimal = delim === ";" ? "," : ".";
+  const table = tokenize(text, delim);
   if (!table.length) throw new DistroKidFormatError(["Sale Month", "Artist", "Earnings (USD)"]);
   const head = table[0].map(norm);
   const col = (names: readonly string[]) => head.findIndex((h) => names.includes(h));
@@ -135,14 +157,14 @@ export function parseDistroKid(text: string): ParseResult {
   const rows: ParsedRow[] = [];
   let invalid = 0;
   for (const r of table.slice(1)) {
-    const month = saleMonth(get(r, "month")), earnings = money(get(r, "earnings"));
-    const qRaw = get(r, "quantity"), q = qRaw === "" ? 0 : money(qRaw);
+    const month = saleMonth(get(r, "month")), earnings = money(get(r, "earnings"), decimal);
+    const qRaw = get(r, "quantity"), q = qRaw === "" ? 0 : money(qRaw, decimal);
     if (!month || earnings == null || q == null) { invalid++; continue; }
     const row = {
       artist: get(r, "artist"), sale_month: month, store: opt(get(r, "store")), title: opt(get(r, "title")),
       isrc: opt(get(r, "isrc")), country: opt(get(r, "country")), quantity: Math.round(q), earnings_usd: earnings,
     };
-    rows.push({ ...row, key: [get(r, "reporting"), month, row.store, row.artist, row.title, row.isrc, row.quantity, row.country, earnings].join("\u001f") });
+    rows.push({ ...row, key: [reportingDate(get(r, "reporting")), month, row.store, row.artist, row.title, row.isrc, row.quantity, row.country, earnings].join("\u001f") });
   }
   return { rows, invalid };
 }

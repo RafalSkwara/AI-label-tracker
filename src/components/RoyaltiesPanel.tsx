@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { DistroKidFormatError, type ImportPlan, type MonthLine, monthTotals, parseDistroKid, planImport } from "@/lib/distrokid";
-import { monthLabel, nf, pln2, usd2 } from "@/lib/format";
+import { monthLabel, nf, plural, pln2, usd2 } from "@/lib/format";
 import { supabase } from "@/lib/supabase";
 import type { Data } from "@/lib/types";
 
@@ -22,16 +22,16 @@ async function loadLines(): Promise<MonthLine[]> {
 }
 
 /** Inserts the planned rows, skipping hashes already stored; returns how many were really new */
-async function store(plan: ImportPlan): Promise<number> {
-  let added = 0;
+async function store(plan: ImportPlan, progress: { added: number }): Promise<void> {
   for (let i = 0; i < plan.rows.length; i += BATCH) {
     const { data, error } = await supabase().from("royalties")
       .upsert(plan.rows.slice(i, i + BATCH), { onConflict: "import_hash", ignoreDuplicates: true }).select("id");
     if (error) throw new Error(error.message);
-    added += data.length;
+    progress.added += data.length; // each batch commits on its own, so a later failure keeps these
   }
-  return added;
 }
+
+const plays = (n: number) => `${nf().format(n)} ${plural(n, "odtworzenie", "odtworzenia", "odtworzeń")}`;
 
 type Summary = { added: number; duplicates: number; skipped: number; skippedArtists: ImportPlan["skipped"]; invalid: number };
 
@@ -46,6 +46,7 @@ export default function RoyaltiesPanel({ data, flash }: { data: Data; flash: (m:
   useEffect(() => { refresh(); }, [refresh]);
 
   const rate = Number(data.settings.usd_pln) || 0;
+  const plnOf = (usd: number) => (rate > 0 ? pln2(usd * rate) : "—");
   const totals = useMemo(() => monthTotals(lines ?? []), [lines]);
   const artistProjects = data.projects.filter((p) => p.kind === "artist" || p.kind === "both");
   const unmapped = artistProjects.filter((p) => !p.distrokid_artist && p.status !== "zamknięty");
@@ -56,31 +57,34 @@ export default function RoyaltiesPanel({ data, flash }: { data: Data; flash: (m:
     setBusy(true);
     setSummary(null);
     setFormatError("");
+    const progress = { added: 0 };
     try {
       const plan = await planImport(parseDistroKid(await file.text()), data.projects);
-      const added = await store(plan);
-      const skipped = plan.skipped.reduce((a, s) => a + s.count, 0) + plan.invalid;
+      await store(plan, progress);
+      const added = progress.added, skipped = plan.skipped.reduce((a, s) => a + s.count, 0) + plan.invalid;
       setSummary({ added, duplicates: plan.rows.length - added, skipped, skippedArtists: plan.skipped, invalid: plan.invalid });
       flash(`Zaimportowano ${added}, pominięto ${skipped}`);
-      await refresh();
     } catch (e) {
       if (e instanceof DistroKidFormatError) setFormatError("To nie wygląda na plik z DistroKid. Brakuje kolumn: " + e.missing.join(", ") + ".");
+      else if (progress.added > 0) flash(`Zaimportowano ${progress.added}, potem błąd: ${(e as Error).message}. Wczytaj plik ponownie`);
       else flash("Nie zaimportowano: " + (e as Error).message);
+    } finally {
+      await refresh(); // also after a partial failure: the stored batches are in the totals
+      setBusy(false);
     }
-    setBusy(false);
   }
 
   return (
     <div className="royalties">
       <div className="panelhead">
-        <div><h2>Muzyka</h2><p className="sub">Import miesięcznego eksportu z DistroKid Bank · kurs {nf(2).format(rate)} zł/USD</p></div>
+        <div><h2>Muzyka</h2><p className="sub">Import miesięcznego eksportu z DistroKid Bank · {rate > 0 ? `kurs ${nf(2).format(rate)} zł/USD` : "brak kursu USD/PLN w ustawieniach"}</p></div>
       </div>
 
       <section className="gate" aria-label="Import">
         <p className="sub" style={{ margin: 0 }}>Wybierz plik CSV lub TSV wyeksportowany z DistroKid. Ten sam plik można wczytać ponownie, nic się nie zdubluje.</p>
         <label className="btn primary filebtn" aria-disabled={busy}>
           {busy ? "Importuję…" : "Wybierz plik z DistroKid"}
-          <input type="file" accept=".csv,.tsv,text/csv" disabled={busy} onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; onFile(f); }} />
+          <input type="file" accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values,text/plain" disabled={busy} onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; onFile(f); }} />
         </label>
         {formatError && <p className="sub ytstate no" role="alert" style={{ margin: 0 }}>{formatError}</p>}
         {summary && (
@@ -110,7 +114,7 @@ export default function RoyaltiesPanel({ data, flash }: { data: Data; flash: (m:
             <div className="head">
               <div style={{ minWidth: 0 }}>
                 <h3>{p.name}</h3>
-                <p className="sub">razem {usd2(sumUsd)} · {pln2(sumUsd * rate)}</p>
+                <p className="sub">razem {usd2(sumUsd)} · {plnOf(sumUsd)}</p>
               </div>
             </div>
             {months.map((m) => (
@@ -118,16 +122,16 @@ export default function RoyaltiesPanel({ data, flash }: { data: Data; flash: (m:
                 <summary>
                   <span className="mo">{monthLabel(m.month)}</span>
                   <span className="val">{usd2(m.usd)}</span>
-                  <span className="sub">{nf().format(m.quantity)} streamów</span>
-                  <span className="sub val">{pln2(m.usd * rate)}</span>
+                  <span className="sub">{plays(m.quantity)}</span>
+                  <span className="sub val">{plnOf(m.usd)}</span>
                 </summary>
                 <span className="label">Top utwory</span>
                 {m.tracks.slice(0, TOP_TRACKS).map((t) => (
                   <div key={t.title} className="track">
                     <span className="t">{t.title}</span>
                     <span className="val">{usd2(t.usd)}</span>
-                    <span className="sub">{nf().format(t.quantity)} streamów</span>
-                    <span className="sub val">{pln2(t.usd * rate)}</span>
+                    <span className="sub">{plays(t.quantity)}</span>
+                    <span className="sub val">{plnOf(t.usd)}</span>
                   </div>
                 ))}
                 {m.tracks.length > TOP_TRACKS && <p className="sub" style={{ margin: 0 }}>+ {m.tracks.length - TOP_TRACKS} więcej</p>}

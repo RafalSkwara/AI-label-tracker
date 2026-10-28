@@ -43,7 +43,7 @@
   - Tradeoff: A comma-delimited file with decimal commas becomes "invalid" rather than guessed. That is safe, because it is visible.
   - Confidence: HIGH — reproduced with the real function.
   - Blind spot: No real export has been seen yet (manual row 6.6).
-- **Decision**: PENDING
+- **Decision**: Applied. Decimal mark decided once per file: `;`-delimited files use `,` as decimal (`.` and spaces are thousands only in real groups), other files use `.` and accept `,` only as real thousands groups; a decimal comma in a comma-delimited file is counted invalid. Same for Quantity. Tests added.
 
 ### F2 — 6.1 is ticked although the migration is not applied
 
@@ -53,7 +53,7 @@
 - **Location**: context/changes/side-hustle-assistant/plan.md:626
 - **Detail**: `- [x] 6.1 Royalties migration applies cleanly — de90339 — written, not applied`. The Phase 7 review (F9) settled that the migration row stays open until it is applied, and the live catalog confirms `royalties` does not exist. As ticked, `/10x-status` reports Phase 6 automated as complete.
 - **Fix**: Untick 6.1 and tick it with the migration version once it has been applied.
-- **Decision**: PENDING
+- **Decision**: Applied. 6.1 was unticked until the migration was applied; ticked after the orchestrator applied it on 2026-10-28.
 
 ### F3 — The file picker's `accept` may grey out the export on a phone
 
@@ -63,7 +63,7 @@
 - **Location**: src/components/RoyaltiesPanel.tsx:83
 - **Detail**: `accept=".csv,.tsv,text/csv"`. Mobile pickers filter by MIME type. Android Chrome maps `.tsv` to `text/tab-separated-values`, and both Android and iOS may report a downloaded export as `text/plain` or `application/octet-stream`. In those cases the file shows up greyed out and Rafał cannot pick it. This app is tested only on a phone, and manual row 6.6 depends on this picker.
 - **Fix**: Use `accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values,text/plain"`, or drop `accept`: the parser already rejects wrong files with "Brakuje kolumn".
-- **Decision**: PENDING
+- **Decision**: Applied. accept is now .csv,.tsv,.txt,text/csv,text/tab-separated-values,text/plain.
 
 ### F4 — A partial failure reports "Nie zaimportowano" after earlier batches were stored
 
@@ -73,7 +73,7 @@
 - **Location**: src/components/RoyaltiesPanel.tsx:24-33, 68
 - **Detail**: Each batch of 500 commits on its own. If batch 3 fails, batches 1-2 are already stored, but the message says nothing was imported, the summary is discarded and `refresh()` is skipped, so the totals on screen are stale. Re-importing is idempotent, so no data is lost.
 - **Fix**: Return or keep the running `added` when an error happens. Flash "Zaimportowano X, potem błąd: … Wczytaj plik ponownie" and call `refresh()` in a `finally`.
-- **Decision**: PENDING
+- **Decision**: Applied. Rows stored before a failing batch are reported ("Zaimportowano X, potem błąd"), the view is refreshed in finally.
 
 ### F5 — The hash uses the raw Reporting Date text, so a re-saved file imports everything again
 
@@ -83,7 +83,7 @@
 - **Location**: src/lib/distrokid.ts:145
 - **Detail**: The key holds `get(r, "reporting")` unparsed, while the month, amounts and quantity are normalised. If the export passes through Excel or Numbers on the phone, `2026-10-14` can become `14.10.2026`, every hash changes, and the whole history is inserted a second time, doubling all totals.
 - **Fix**: Normalise Reporting Date to `YYYY-MM-DD` before building the key, and keep the raw text only if the date cannot be parsed. Do it before the first real import, because changing the key afterwards changes every hash.
-- **Decision**: PENDING
+- **Decision**: Applied. Reporting Date normalised to YYYY-MM-DD in the hash key; unparseable text kept as is. No real rows exist yet, so no hash migration.
 
 ### F6 — A space before an opening quote breaks the row
 
@@ -93,7 +93,7 @@
 - **Location**: src/lib/distrokid.ts:88
 - **Detail**: Quoting starts only when `field === ""`, so `A, "x, y",0.1` splits the title and shifts the columns. Probe result: `{"rows":[],"invalid":1}`. The row is counted as unreadable rather than stored wrong, so this is low risk.
 - **Fix**: Start quoting when `field.trim() === ""`, and reset `field` at that point.
-- **Decision**: PENDING
+- **Decision**: Applied. A quote opens a field when the text before it is blank.
 
 ### F7 — "streamów" for every number, and Quantity includes downloads
 
@@ -103,7 +103,7 @@
 - **Location**: src/components/RoyaltiesPanel.tsx:121, 128
 - **Detail**: The labels read "1 streamów" and "2 streamów", which is wrong Polish (the forms are stream, streamy, streamów). DistroKid's Quantity also counts downloads. Separately, when `usd_pln` is unset (`rate` at :48), PLN silently shows 0,00 zł; the live value is 3.7.
 - **Fix**: Use a plural helper (`stream/streamy/streamów`) or the neutral "odtw." label.
-- **Decision**: PENDING
+- **Decision**: Applied. Plural helper (odtworzenie/odtworzenia/odtworzeń); PLN shows a dash and the header says the rate is missing when usd_pln is not set.
 
 ### F8 — The tests do not cover the risky cases
 
@@ -113,7 +113,7 @@
 - **Location**: tests/integration/distrokid.test.ts
 - **Detail**: The suite is meaningful: real-shape fixture, quotes and commas, a repeated line, unknown artist, TSV/BOM/CRLF, totals, idempotent re-import. It misses three cases that decide correctness in practice: (a) a cumulative export, where an older file is a subset of a newer one and only the new rows' hashes differ; (b) decimal commas with three digits and `;` files (F1); (c) occurrence numbering when the identical lines are not adjacent.
 - **Fix**: Add these three cases, for example by appending new lines to the fixture and asserting that only those lines get new hashes.
-- **Decision**: PENDING
+- **Decision**: Applied. Added tests: cumulative export, semicolon file with three-decimal commas, identical non-adjacent lines, re-saved date format with a space before a quote.
 
 ## Ordering
 
