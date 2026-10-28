@@ -3,6 +3,7 @@
 import { dmy } from "@/lib/format";
 import { type Alert, gateRules, gateStatus, when } from "@/lib/rules";
 import type { Data } from "@/lib/types";
+import Fresh from "./Fresh";
 import Integrations from "./Integrations";
 
 const SEV = { high: "Pilne", med: "Ważne", low: "Info" } as const;
@@ -38,6 +39,8 @@ export default function Today({ data, today, list, onOpen, onReload, flash }: { 
       </section>
 
       <Integrations data={data} onDone={onReload} flash={flash} />
+
+      <Fresh data={data} today={today} />
 
       <section className="gates" aria-label="Bramki">
         <span className="label">Bramki</span>

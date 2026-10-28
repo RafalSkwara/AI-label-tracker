@@ -96,6 +96,14 @@ export type Integration = {
   last_error: string | null;
 };
 
+/** video_traffic: one source type of one video over the 28 days ending at period_end */
+export type VideoTraffic = { project_id: string; yt_video_id: string; period_end: string; source_type: string; views: number; watch_minutes: number };
+
+export type SearchTermRow = { project_id: string; yt_video_id: string; period_end: string; term: string; views: number };
+
+/** v_views_24h: latest public counter and the snapshot it is compared with */
+export type Views24 = { project_id: string; yt_video_id: string; taken_at: string; view_count: number; base_taken_at: string | null; base_view_count: number | null };
+
 export type Settings = { budget_min: number; budget_max: number; usd_pln: number; vat_pct: number };
 
 export type XpEvent = { kind: string; ref: string; title: string; at: string; xp: number };
@@ -109,6 +117,9 @@ export type Data = {
   gates: Gate[];
   videos: VideoRecent[];
   integrations: Integration[];
+  traffic: VideoTraffic[];
+  terms: SearchTermRow[];
+  views24: Views24[];
   settings: Settings;
   xp: XpEvent[];
 };

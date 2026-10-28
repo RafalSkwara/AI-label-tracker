@@ -124,3 +124,63 @@ export function toWeeks(rows: VideoDay[], from?: string): WeekRow[] {
     ctr_pct: a.hasR && a.imp ? r2((a.clicks / a.imp) * 100) : null,
   }));
 }
+
+export type TrafficRow = { source_type: string; views: number; watch_minutes: number };
+export type SearchTerm = { term: string; views: number };
+export type VideoStat = { yt_video_id: string; view_count: number; like_count: number | null; comment_count: number | null };
+
+/** Column lookup by header name, so a reordered response still maps correctly */
+function table(json: AnalyticsJson, dims: string[], metrics: string[]) {
+  const names = (json.columnHeaders ?? []).map((h) => h.name);
+  const idx = [...dims, ...metrics].map((n) => names.indexOf(n));
+  if (idx.slice(0, dims.length).some((i) => i < 0)) throw new Error(`Analytics response lacks the ${dims.join("/")} column`);
+  return (json.rows ?? []).map((r) => ({
+    dims: idx.slice(0, dims.length).map((i) => String(r[i])),
+    metrics: idx.slice(dims.length).map((i) => (i < 0 ? 0 : Number(r[i]) || 0)),
+  }));
+}
+
+/** Analytics `dimensions=insightTrafficSourceType` for one video → one row per source type */
+export function mapTraffic(json: AnalyticsJson): TrafficRow[] {
+  return table(json, ["insightTrafficSourceType"], ["views", "estimatedMinutesWatched"])
+    .map((r) => ({ source_type: r.dims[0], views: r.metrics[0], watch_minutes: r.metrics[1] }));
+}
+
+/** Analytics `dimensions=insightTrafficSourceDetail` (type YT_SEARCH) → search terms with views, empty terms skipped */
+export function mapSearchTerms(json: AnalyticsJson): SearchTerm[] {
+  return table(json, ["insightTrafficSourceDetail"], ["views"])
+    .map((r) => ({ term: r.dims[0].trim(), views: r.metrics[0] }))
+    .filter((r) => r.term);
+}
+
+/** Data API `videos.list(part=statistics)` → counters per video. Hidden likes/comments come back absent → null. */
+export function mapStats(json: { items?: { id: string; statistics?: { viewCount?: string; likeCount?: string; commentCount?: string } }[] }): VideoStat[] {
+  const n = (v?: string) => (v == null || v === "" || isNaN(Number(v)) ? null : Number(v));
+  return (json.items ?? []).flatMap((it) => {
+    const views = n(it.statistics?.viewCount);
+    return views == null ? [] : [{ yt_video_id: it.id, view_count: views, like_count: n(it.statistics?.likeCount), comment_count: n(it.statistics?.commentCount) }];
+  });
+}
+
+/** Display groups for the traffic sources, in the order the app lists them */
+export const TRAFFIC_GROUPS = ["Sugerowane", "Wyszukiwarka", "Przeglądanie", "Zewnętrzne", "Playlisty", "Inne"] as const;
+export type TrafficGroup = (typeof TRAFFIC_GROUPS)[number];
+
+const GROUP_OF: Record<string, TrafficGroup> = {
+  RELATED_VIDEO: "Sugerowane",
+  YT_SEARCH: "Wyszukiwarka",
+  SUBSCRIBER: "Przeglądanie",
+  EXT_URL: "Zewnętrzne", NO_LINK_EMBEDDED: "Zewnętrzne", NO_LINK_OTHER: "Zewnętrzne",
+  PLAYLIST: "Playlisty",
+};
+
+/** Sums the source types into the six display groups; shares are of total views (0 when there are none) */
+export function groupTraffic(rows: { source_type: string; views: number }[]): { group: TrafficGroup; views: number; share: number }[] {
+  const sum = new Map<TrafficGroup, number>(TRAFFIC_GROUPS.map((g) => [g, 0]));
+  for (const r of rows) {
+    const g = GROUP_OF[r.source_type] ?? "Inne";
+    sum.set(g, (sum.get(g) ?? 0) + r.views);
+  }
+  const total = [...sum.values()].reduce((a, b) => a + b, 0);
+  return TRAFFIC_GROUPS.map((group) => ({ group, views: sum.get(group) ?? 0, share: total ? (sum.get(group) ?? 0) / total : 0 }));
+}

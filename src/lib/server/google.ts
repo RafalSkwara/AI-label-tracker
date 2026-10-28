@@ -65,18 +65,23 @@ export async function myChannel(at: string): Promise<{ id: string; uploads: stri
   return { id: c.id, uploads: c.contentDetails.relatedPlaylists.uploads };
 }
 
-/** Video ids of the uploads playlist, newest first (up to 3 pages of 50) */
-export async function uploadIds(at: string, playlist: string): Promise<string[]> {
-  const ids: string[] = [];
+export type Upload = { id: string; publishedAt: string };
+
+/** The uploads playlist id is the channel id with the UC prefix replaced by UU; null when the id has another shape */
+export const uploadsPlaylistOf = (channelId: string) => (channelId.startsWith("UC") ? "UU" + channelId.slice(2) : null);
+
+/** Uploads playlist entries, newest first (up to 3 pages of 50) */
+export async function uploads(at: string, playlist: string): Promise<Upload[]> {
+  const out: Upload[] = [];
   let page: string | undefined;
   for (let i = 0; i < 3; i++) {
-    const j = await get<{ items?: { contentDetails: { videoId: string } }[]; nextPageToken?: string }>(
+    const j = await get<{ items?: { contentDetails: { videoId: string; videoPublishedAt?: string } }[]; nextPageToken?: string }>(
       "https://www.googleapis.com/youtube/v3/playlistItems?" + qs({ part: "contentDetails", playlistId: playlist, maxResults: 50, pageToken: page }), at, "playlistItems.list");
-    ids.push(...(j.items ?? []).map((x) => x.contentDetails.videoId));
+    out.push(...(j.items ?? []).map((x) => ({ id: x.contentDetails.videoId, publishedAt: x.contentDetails.videoPublishedAt ?? "" })));
     page = j.nextPageToken;
     if (!page) break;
   }
-  return ids;
+  return out;
 }
 
 export function analytics(at: string, ids: string[], start: string, end: string) {
@@ -120,4 +125,32 @@ export async function downloadReport(at: string, url: string): Promise<string> {
   const r = await tfetch(url, { headers: { authorization: `Bearer ${at}` } }, 60_000);
   if (!r.ok) throw new GoogleError(`report download: ${r.status}`, r.status);
   return r.text();
+}
+
+const ANALYTICS = "https://youtubeanalytics.googleapis.com/v2/reports?";
+type AnalyticsJson = { columnHeaders?: { name: string }[]; rows?: (string | number)[][] | null };
+
+/**
+ * Traffic sources of ONE video. Kept behind this helper: `video==a,b` would sum the videos into one row
+ * (video is not a dimension of this report), so per-video shares need one call per video.
+ */
+export function trafficSources(at: string, videoId: string, start: string, end: string) {
+  return get<AnalyticsJson>(ANALYTICS + qs({
+    ids: "channel==MINE", startDate: start, endDate: end, dimensions: "insightTrafficSourceType",
+    filters: "video==" + videoId, metrics: "views,estimatedMinutesWatched", sort: "-views",
+  }), at, "analytics.traffic");
+}
+
+/** Top YouTube search terms of one video */
+export function searchTerms(at: string, videoId: string, start: string, end: string) {
+  return get<AnalyticsJson>(ANALYTICS + qs({
+    ids: "channel==MINE", startDate: start, endDate: end, dimensions: "insightTrafficSourceDetail",
+    filters: `video==${videoId};insightTrafficSourceType==YT_SEARCH`, metrics: "views", sort: "-views", maxResults: 25,
+  }), at, "analytics.searchTerms");
+}
+
+/** Public counters (1 quota unit per call), up to 50 ids */
+export function videoStatistics(at: string, ids: string[]) {
+  return get<{ items?: { id: string; statistics?: { viewCount?: string; likeCount?: string; commentCount?: string } }[] }>(
+    "https://www.googleapis.com/youtube/v3/videos?" + qs({ part: "statistics", id: ids.join(","), maxResults: 50 }), at, "videos.list");
 }
