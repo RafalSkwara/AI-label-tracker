@@ -19,6 +19,16 @@ export const num = (v: unknown): number | null =>
 export const localDateTime = (t: string) =>
   new Intl.DateTimeFormat("pl-PL", { timeZone: "Europe/Warsaw", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }).format(new Date(t));
 
+const money2 = new Intl.NumberFormat("pl-PL", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+/** Royalties are small amounts: always two decimals */
+export const usd2 = (n: number) => "$" + money2.format(n);
+export const pln2 = (n: number) => money2.format(n) + " zł";
+/** Polish plural form for a count: 1 -> one, 2-4 (not 12-14) -> few, otherwise many */
+export const plural = (n: number, one: string, few: string, many: string) =>
+  n === 1 ? one : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? few : many;
+/** "2026-09" -> "wrzesień 2026" */
+export const monthLabel = (ym: string) => new Date(ym.slice(0, 7) + "-01T00:00:00").toLocaleDateString("pl-PL", { month: "long", year: "numeric" });
+
 /** Polish text for the common sync errors; the raw text is shown only as a detail line */
 export const syncErrorPl = (raw: string) =>
   /^Traffic:/.test(raw) ? "Źródła ruchu nie zostały pobrane, dane dzienne są aktualne"
