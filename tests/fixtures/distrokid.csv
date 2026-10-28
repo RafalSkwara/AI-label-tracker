@@ -1,0 +1,10 @@
+Reporting Date,Sale Month,Store,Artist,Title,ISRC,Quantity,Country of Sale,Earnings (USD)
+2026-10-14,2026-09,Spotify,Contents May Vary,"Hello, World",QZ1234500001,120,US,0.4821
+2026-10-14,2026-09,Spotify,Contents May Vary,"Hello, World",QZ1234500001,40,PL,0.1234
+2026-10-14,2026-09,Apple Music,Contents May Vary,"The ""Quiet"" Hours",QZ1234500002,10,DE,0.0900
+2026-10-14,2026-09,Spotify,Contents May Vary,Night Drive,QZ1234500003,300,GB,1.0500
+2026-10-14,2026-09,Spotify,Contents May Vary,Night Drive,QZ1234500003,300,GB,1.0500
+2026-09-14,2026-08,Spotify,Contents May Vary,"Hello, World",QZ1234500001,80,US,0.3000
+2026-10-14,2026-09,Spotify,Elektronika,Signal Path,QZ1234500004,50,US,0.2000
+2026-10-14,2026-09,YouTube Music,Some Other Artist,Elsewhere,QZ9999900001,70,US,0.2500
+2026-10-14,2026-09,Spotify,Some Other Artist,Elsewhere,QZ9999900001,30,US,0.1000

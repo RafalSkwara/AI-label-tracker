@@ -19,6 +19,13 @@ export const num = (v: unknown): number | null =>
 export const localDateTime = (t: string) =>
   new Intl.DateTimeFormat("pl-PL", { timeZone: "Europe/Warsaw", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }).format(new Date(t));
 
+const money2 = new Intl.NumberFormat("pl-PL", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+/** Royalties are small amounts: always two decimals */
+export const usd2 = (n: number) => "$" + money2.format(n);
+export const pln2 = (n: number) => money2.format(n) + " zł";
+/** "2026-09" -> "wrzesień 2026" */
+export const monthLabel = (ym: string) => new Date(ym.slice(0, 7) + "-01T00:00:00").toLocaleDateString("pl-PL", { month: "long", year: "numeric" });
+
 /** Polish text for the common sync errors; the raw text is shown only as a detail line */
 export const syncErrorPl = (raw: string) =>
   /^Traffic:/.test(raw) ? "Źródła ruchu nie zostały pobrane, dane dzienne są aktualne"

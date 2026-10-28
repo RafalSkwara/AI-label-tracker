@@ -7,6 +7,7 @@ import { XP_PER_LEVEL, badges, costTotals, levelName, levelOf, monthly, streak, 
 import { supabase } from "@/lib/supabase";
 import type { Coll, Data, Item, Settings, Sub, Task, Week } from "@/lib/types";
 import { type Alert, alerts } from "@/lib/rules";
+import RoyaltiesPanel from "./RoyaltiesPanel";
 import Sheet from "./Sheet";
 import Today from "./Today";
 import WeeksChart from "./WeeksChart";
@@ -18,6 +19,7 @@ const TABS = [
   { id: "tygodnie", name: "Tygodnie", coll: "weeks" },
   { id: "koszty", name: "Koszty", coll: "subs" },
   { id: "subskrypcje", name: "Subskrypcje", coll: "subs" },
+  { id: "muzyka", name: "Muzyka", coll: "none" },
 ] as const;
 type TabId = (typeof TABS)[number]["id"];
 const NOUN: Record<Coll, string> = { tasks: "zadanie", items: "pozycję", weeks: "tydzień", subs: "subskrypcję" };
@@ -169,7 +171,7 @@ export default function Tracker({ email }: { email: string }) {
             {TABS.map((t) => (
               <button key={t.id} role="tab" id={"tab-" + t.id} aria-selected={tab === t.id} onClick={() => pickTab(t.id)}>
                 {t.name}
-                <span className="count">{t.coll === null ? alertList.filter((a) => a.severity !== "low").length : t.coll === "tasks" ? data.tasks.filter((x) => !x.done).length : data[t.coll].length}</span>
+                <span className="count">{t.coll === "none" ? null : t.coll === null ? alertList.filter((a) => a.severity !== "low").length : t.coll === "tasks" ? data.tasks.filter((x) => !x.done).length : data[t.coll].length}</span>
               </button>
             ))}
           </nav>
@@ -185,6 +187,7 @@ export default function Tracker({ email }: { email: string }) {
             {tab === "tygodnie" && <WeeksPanel data={data} onAdd={() => setEditing({ coll: "weeks", rec: null })} onEdit={(w) => setEditing({ coll: "weeks", rec: w })} />}
             {tab === "koszty" && <CostsPanel data={data} onAdd={() => setEditing({ coll: "subs", rec: null })} onEdit={(s) => setEditing({ coll: "subs", rec: s })}
               onSettings={(k, v) => run(() => saveSettings({ [k]: v }), "Zapisano ustawienia")} />}
+            {tab === "muzyka" && <RoyaltiesPanel data={data} flash={flash} />}
             {tab === "subskrypcje" && <SubsPanel data={data} onAdd={() => setEditing({ coll: "subs", rec: null })} onEdit={(s) => setEditing({ coll: "subs", rec: s })} />}
           </main>
         </>

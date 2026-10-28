@@ -221,3 +221,19 @@ button.alert:hover{border-color:var(--muted)}
 .why .share>span:last-child{text-align:right}
 .why .bar{height:8px;background:var(--line);border-radius:4px;overflow:hidden}
 .why .bar i{display:block;height:100%;background:var(--accent)}
+
+/* muzyka (royalties) */
+.royalties{display:grid;gap:14px}
+.royalties .filebtn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;cursor:pointer;position:relative}
+.royalties .filebtn input{position:absolute;width:1px;height:1px;opacity:0;overflow:hidden}
+.royalties .filebtn:focus-within{outline:2px solid var(--accent);outline-offset:2px}
+.royalties .filebtn[aria-disabled="true"]{opacity:.5;pointer-events:none}
+.royalties .summary{display:grid;gap:4px;font-size:.88rem}
+.royalties .summary ul{margin:0;padding-left:1.2rem}
+.roy .why summary{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 12px;align-items:center}
+.roy .why summary .mo{font-weight:500}
+.roy .why summary .sub{margin:0;font-size:.82rem}
+.roy .val{font-family:var(--f-mono);font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+.roy .track{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 12px;font-size:.88rem}
+.roy .track .t{overflow-wrap:anywhere}
+.roy .track .sub{margin:0;font-size:.82rem}
