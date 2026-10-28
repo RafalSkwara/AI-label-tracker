@@ -634,7 +634,7 @@ Delegated to the agent per Rafał's working rules (non-UI decisions are the agen
 
 #### Automated
 
-- [ ] 7.1 Traffic and snapshot migration applies cleanly, authenticated read-only — written, not applied (orchestrator applies) — f199017
+- [x] 7.1 Traffic and snapshot migration applies cleanly, authenticated read-only — applied 2026-10-28 by orchestrator; authenticated select yes / insert no, anon none
 - [x] 7.2 YouTube mapping integration test passes (traffic, search terms, stats) — f199017
 - [x] 7.3 Type checking passes — f199017
 - [x] 7.4 Linting passes — f199017
