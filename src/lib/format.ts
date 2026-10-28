@@ -21,7 +21,8 @@ export const localDateTime = (t: string) =>
 
 /** Polish text for the common sync errors; the raw text is shown only as a detail line */
 export const syncErrorPl = (raw: string) =>
-  /invalid_grant/.test(raw) ? "Wymagane ponowne połączenie konta YouTube"
+  /^Traffic:/.test(raw) ? "Źródła ruchu nie zostały pobrane, dane dzienne są aktualne"
+  : /invalid_grant/.test(raw) ? "Wymagane ponowne połączenie konta YouTube"
   : /different channel/i.test(raw) ? "Zapisane konto należy do innego kanału niż projekt"
   : /quota|rateLimit|too many/i.test(raw) ? "Przekroczony limit zapytań YouTube, spróbuj później"
   : /timeout|timed out|abort|fetch failed|network/i.test(raw) ? "Brak odpowiedzi od YouTube, spróbuj ponownie"

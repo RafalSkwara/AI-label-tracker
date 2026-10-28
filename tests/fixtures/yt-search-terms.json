@@ -1,0 +1,14 @@
+{
+  "kind": "youtubeAnalytics#resultTable",
+  "columnHeaders": [
+    { "name": "insightTrafficSourceDetail", "columnType": "DIMENSION", "dataType": "STRING" },
+    { "name": "views", "columnType": "METRIC", "dataType": "INTEGER" }
+  ],
+  "rows": [
+    ["rain sounds for sleep", 22],
+    ["slow fall scenes", 14],
+    ["  ", 3],
+    ["autumn ambience", 9],
+    ["slow fall scenes ", 6]
+  ]
+}

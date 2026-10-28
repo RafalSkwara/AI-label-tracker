@@ -1,23 +1,24 @@
-# Handoff — Side Hustle Assistant (2026-10-26)
+# Handoff — Side Hustle Assistant (updated 2026-10-28)
 
-Read this first in a new session. It lets the orchestrator start Phase 1 without asking anything.
+Read this first in a new session. It lets the orchestrator pick up the next phase without asking anything.
 
 ## State
 
-- Change: `context/changes/side-hustle-assistant/` — status `plan_reviewed`.
+- Change: `context/changes/side-hustle-assistant/` — status `implementing`.
   - `plan.md` is canonical (phases, success criteria, Progress table, Review decisions).
   - `plan-brief.md` is the one-page summary; `reviews/plan-review.md` holds the review (all findings accepted and applied).
-- Nothing is implemented yet. The live app is still "Tracker Wydawnictwa" at https://ai-label-tracker.sidereus.workers.dev (deploys from `main` via Workers Builds).
+- Phases 1–3 are merged (PRs #5–#7). The YouTube sync runs daily at 05:00 UTC; Slowfall and Contents May Vary are connected; impressions/CTR arrive since 2026-10-28. The app runs at https://ai-label-tracker.sidereus.workers.dev (deploys from `main` via Workers Builds).
+- Open manual checks: 2.4, 2.5, 3.7, 3.8 (Rafał, on the phone). 3.6 is done (both channels connected).
+- Phase 7 (traffic sources, search terms, hourly view counter) was added on 2026-10-28 at Rafał's request.
 - Supabase project `gigsqrnwyeioqlkngfqe`. Tasks were updated for the 2026-10-26 strategy (option B) before planning.
 
 ## Next step
 
 ```
-git fetch origin main && git checkout -B feat/sha-phase-1 origin/main
-/10x-implement side-hustle-assistant phase 1
+/10x-implement side-hustle-assistant phase 7
 ```
 
-One PR per phase into `main`. Start each phase from a fresh `origin/main` after the previous PR is merged. Release 1 = phases 1–3, target 2026-10-31.
+Order: 7 → 4 (rename) → 5 (push) → 6 (DistroKid CSV). Phase 7 goes first because hourly snapshots only exist from the day they start; push stays after the rename because subscriptions are bound to the origin. One PR per phase into `main`. Start each phase from a fresh `origin/main` after the previous PR is merged.
 
 ## Working rules (from Rafał)
 

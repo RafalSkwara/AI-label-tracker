@@ -213,3 +213,11 @@ button.alert:hover{border-color:var(--muted)}
 .legal hr{border:0;border-top:1px solid var(--line);margin:8px 0;width:100%}
 .integrations .btn{min-height:44px}
 .ytdetail{font-size:.75rem;overflow-wrap:anywhere}
+.fresh{display:grid;gap:8px}
+.fresh .big{font-size:1.4rem;font-weight:600;white-space:nowrap}
+.why{border-top:1px solid var(--line);padding-top:8px;display:grid;gap:6px}
+.why summary{cursor:pointer;min-height:44px;display:flex;align-items:center;overflow-wrap:anywhere}
+.why .share{display:grid;grid-template-columns:7.5rem minmax(0,1fr) 3rem;gap:8px;align-items:center;font-size:.88rem}
+.why .share>span:last-child{text-align:right}
+.why .bar{height:8px;background:var(--line);border-radius:4px;overflow:hidden}
+.why .bar i{display:block;height:100%;background:var(--accent)}

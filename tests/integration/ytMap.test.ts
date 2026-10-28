@@ -1,9 +1,10 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { firstMondayOnOrAfter, mapAnalytics, mapReach, toWeeks } from "../../src/lib/ytMap";
+import { firstMondayOnOrAfter, groupTraffic, mapAnalytics, mapReach, mapSearchTerms, mapStats, mapTraffic, toWeeks } from "../../src/lib/ytMap";
 
 const analytics = JSON.parse(readFileSync("tests/fixtures/yt-analytics.json", "utf8"));
 const reach = readFileSync("tests/fixtures/reach.csv", "utf8");
+const fixture = (n: string) => JSON.parse(readFileSync(`tests/fixtures/${n}.json`, "utf8"));
 
 describe("YouTube mapping", () => {
   it("maps Analytics rows to the Analytics columns only", () => {
@@ -47,5 +48,37 @@ describe("YouTube mapping", () => {
     expect(toWeeks(rows, "2026-10-19").map((w) => w.week_start)).toEqual(["2026-10-19"]);
     // Reach rows alone (backfill older than the Analytics window) produce no week, not a week of zeros
     expect(toWeeks(mapReach(reach))).toEqual([]);
+  });
+
+  it("maps traffic sources by header name and groups them into the six display groups", () => {
+    const rows = mapTraffic(fixture("yt-traffic"));
+    expect(rows[0]).toEqual({ source_type: "RELATED_VIDEO", views: 120, watch_minutes: 400 });
+    expect(rows).toHaveLength(8);
+    const g = Object.fromEntries(groupTraffic(rows).map((x) => [x.group, x.views]));
+    // external = EXT_URL + NO_LINK_OTHER; "Inne" = YT_CHANNEL + SHORTS
+    expect(g).toEqual({ Sugerowane: 120, Wyszukiwarka: 60, Przeglądanie: 30, Zewnętrzne: 10, Playlisty: 10, Inne: 10 });
+    expect(groupTraffic(rows).reduce((a, x) => a + x.share, 0)).toBeCloseTo(1);
+    expect(groupTraffic([]).every((x) => x.share === 0)).toBe(true);
+  });
+
+  it("maps search terms and drops blank terms", () => {
+    expect(mapSearchTerms(fixture("yt-search-terms"))).toEqual([
+      { term: "rain sounds for sleep", views: 22 }, { term: "slow fall scenes", views: 20 }, { term: "autumn ambience", views: 9 },
+    ]);
+    // "slow fall scenes " (trailing space) merges into "slow fall scenes": 14 + 6
+    expect(mapSearchTerms({ columnHeaders: [{ name: "insightTrafficSourceDetail" }, { name: "views" }], rows: null })).toEqual([]);
+  });
+
+  it("finds traffic columns by header name when the order differs, and throws when the dimension is missing", () => {
+    const reordered = { columnHeaders: [{ name: "estimatedMinutesWatched" }, { name: "insightTrafficSourceType" }, { name: "views" }], rows: [[40, "YT_SEARCH", 7]] };
+    expect(mapTraffic(reordered)).toEqual([{ source_type: "YT_SEARCH", views: 7, watch_minutes: 40 }]);
+    expect(() => mapTraffic({ columnHeaders: [{ name: "views" }], rows: [[1]] })).toThrow(/insightTrafficSourceType/);
+  });
+
+  it("maps public counters: strings to numbers, hidden likes/comments to null, videos without statistics skipped", () => {
+    expect(mapStats(fixture("yt-stats"))).toEqual([
+      { yt_video_id: "Y1zTI-zy9HA", view_count: 1234, like_count: 56, comment_count: 7 },
+      { yt_video_id: "yL4czbAFQ54", view_count: 98, like_count: null, comment_count: null },
+    ]);
   });
 });

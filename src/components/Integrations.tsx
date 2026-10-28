@@ -62,7 +62,7 @@ export default function Integrations({ data, onDone, flash }: { data: Data; onDo
             </div>
             <div className="actions">
               {i && <button className="btn" disabled={busy === p.id} onClick={() => sync(p)}>{busy === p.id ? "Synchronizuję…" : "Synchronizuj teraz"}</button>}
-              <button className={i && !i.last_error ? "btn" : "btn primary"} disabled={busy === p.id} onClick={() => connect(p)}>{i ? "Połącz ponownie" : "Połącz YouTube"}</button>
+              <button className={i && (!i.last_error || /^Traffic:/.test(i.last_error)) ? "btn" : "btn primary"} disabled={busy === p.id} onClick={() => connect(p)}>{i ? "Połącz ponownie" : "Połącz YouTube"}</button>
             </div>
           </article>
         );

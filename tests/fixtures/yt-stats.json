@@ -1,0 +1,8 @@
+{
+  "kind": "youtube#videoListResponse",
+  "items": [
+    { "kind": "youtube#video", "id": "Y1zTI-zy9HA", "statistics": { "viewCount": "1234", "likeCount": "56", "favoriteCount": "0", "commentCount": "7" } },
+    { "kind": "youtube#video", "id": "yL4czbAFQ54", "statistics": { "viewCount": "98", "favoriteCount": "0" } },
+    { "kind": "youtube#video", "id": "noStatsVideo1" }
+  ]
+}

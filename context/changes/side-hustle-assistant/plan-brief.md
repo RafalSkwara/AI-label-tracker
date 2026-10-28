@@ -51,6 +51,7 @@ The browser keeps reading Supabase through RLS. New Next API routes (`/api/yt/*`
 | 4. Rename | New URL, 301 keeping path + query, smoke E2E | Order of steps in Supabase Auth, Google and CF dashboards |
 | 5. PWA push | Morning notification | Web Push library on workerd; iOS only as PWA |
 | 6. DistroKid CSV | "Muzyka" tab with revenue | Export format may change |
+| 7. Traffic + hourly views (added 10-28, runs before 4) | Traffic sources, search terms, 24 h view counter | Workers Free subrequest cap; the Data API counter is the only fresh metric |
 
 **Prerequisites:** a Google Cloud project with an OAuth client ("In production") on smartlife.dev.ai; secrets in Cloudflare (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `SUPABASE_SECRET_KEY`, `STATE_SECRET`, `CRON_SECRET`, later VAPID); Workers plan confirmed (Free works with the 10-reports cap). See `context/handoff.md`.
 **Estimated effort:** ~6 sessions (one per phase); release 1 (phases 1–3) ~3 sessions.

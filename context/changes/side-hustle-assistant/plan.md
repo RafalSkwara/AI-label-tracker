@@ -368,6 +368,77 @@ Manual import of the monthly DistroKid Bank export, mapped to artist projects.
 
 ---
 
+## Phase 7: Traffic sources, search terms and hourly views
+
+Added 2026-10-28 at Rafał's request. Independent of phases 4–6; recommended to run **before** phase 4, because hourly snapshots only exist from the day they start.
+
+### Overview
+
+Extend the YouTube sync with (a) traffic sources and YouTube search terms per video and (b) an hourly view counter from the Data API. The counter is the only metric fresher than the 2–3-day Analytics/Reporting lag; Studio's "realtime" panel has no API, and watch time, CTR and impressions cannot be made fresher.
+
+### Changes Required:
+
+#### 1. Storage
+
+**File**: migration `supabase/migrations/<ts>_traffic_and_snapshots.sql`
+
+**Intent**: Keep the 28-day traffic breakdown and hourly counters per video.
+
+**Contract**:
+- `video_traffic(project_id, yt_video_id, period_end date, source_type text, views int, watch_minutes numeric, updated_at)`, PK `(yt_video_id, period_end, source_type)`. Written by the daily run for the window `period_end − 27 d … period_end` (`period_end` = latest day Analytics returned); a re-run on the same day overwrites.
+- `video_search_terms(project_id, yt_video_id, period_end date, term text, views int)`, PK `(yt_video_id, period_end, term)`; top 25 per video.
+- `video_stats_hourly(project_id, yt_video_id, taken_at timestamptz, view_count bigint, like_count int, comment_count int)`, PK `(yt_video_id, taken_at)` with `taken_at` truncated to the hour. The hourly run removes rows older than 14 days.
+- All three: RLS owner-read (`is_owner()`), writes only by the service role.
+
+#### 2. Sync
+
+**File**: `src/lib/server/ytSync.ts`, `src/lib/ytMap.ts`, `src/app/api/cron/route.ts`, `worker.ts`, `wrangler.jsonc`
+
+**Intent**: Daily run adds two Analytics queries; a new hourly run reads public statistics.
+
+**Contract**:
+- Daily (`0 5 * * *`), after the existing steps: `reports.query` with `dimensions=insightTrafficSourceType`, `filters=video==<id>`, metrics `views,estimatedMinutesWatched`, last 28 days, one call per video uploaded in the last 90 days; then for each such video `dimensions=insightTrafficSourceDetail`, `filters=video==<id>;insightTrafficSourceType==YT_SEARCH`, `sort=-views`, `maxResults=25`. Verify during implementation whether the first query accepts a comma-separated `video==a,b` filter; if it does, use one call per channel.
+- Hourly (`30 * * * *`, offset from the daily trigger): per integration, refresh the token once and call Data API `videos.list(part=statistics, id=<≤50 ids>)` (1 quota unit) for videos from the last 90 days; upsert `video_stats_hourly`.
+- `worker.ts` passes the trigger to the route: header `x-cron-kind: daily | hourly` from `controller.cron`. `/api/cron` runs the daily sync (and later push) only for `daily`, snapshots only for `hourly`.
+- Subrequest budget (Workers Free, 50 per invocation): daily adds 2 calls per recent video — cap at 8 videos per run (newest first), the rest wait for the next run; hourly stays ≤ 3 calls per integration.
+- `ytMap.ts`: `mapTraffic(json)`, `mapSearchTerms(json)`, `mapStats(json)` — pure functions.
+
+#### 3. UI
+
+**File**: `src/components/Today.tsx`, a per-video panel (in the project view or Tygodnie)
+
+**Intent**: Fresh numbers on Dziś and the "why" per video.
+
+**Contract**:
+- Dziś: "Ostatnie 24 h" card per project — views from the hourly counter (latest snapshot minus the snapshot ≥ 24 h older), plus the same per video for videos published in the last 7 days. Label the source as "licznik publiczny, ~1 h".
+- Per video: traffic-source shares for the last 28 days (Sugerowane, Wyszukiwarka, Przeglądanie, Zewnętrzne, Playlisty, Inne) and the top 10 search terms with views.
+- No new alerts in this phase; push (phase 5) can later use the 24 h counter.
+
+#### 4. Test
+
+**File**: `tests/integration/ytMap.test.ts`, fixtures `tests/fixtures/yt-traffic.json`, `yt-search-terms.json`, `yt-stats.json`
+
+**Intent**: Extend the existing integration test with the three new mappings (captured from real calls). No new test files.
+
+### Success Criteria:
+
+#### Automated Verification:
+
+- Migration applies cleanly; `authenticated` can select but not insert into the three tables
+- YouTube mapping integration test passes: `npm run test:int`
+- Type checking passes: `npm run typecheck`
+- Linting passes: `npm run lint`
+- OpenNext build passes: `npm run build`
+
+#### Manual Verification:
+
+- After one day, traffic-source shares for film #1 match Studio (±5 pp) and the top search terms match Studio's "YouTube search" list
+- After two hourly runs, Dziś shows a 24 h view count that is consistent with the public counter on YouTube
+
+**Implementation Note**: After automated verification passes, pause for Rafał's confirmation.
+
+---
+
 ## Testing Strategy
 
 Rafał's decision (2026-10-26): no unit tests, only the key contact points.
@@ -455,6 +526,16 @@ Delegated to the agent per Rafał's working rules (non-UI decisions are the agen
 | Phase 3 fixtures | `tests/fixtures/*` are hand-written to the documented formats (no OAuth token was available to capture a real call). **Unverified assumptions to check on the first real sync:** `video_thumbnail_impressions_ctr` is a fraction (0.05 = 5%) and is stored ×100; Analytics returns `day,video` rows for the `filters=video==` query without extra paging |
 | Phase 3 review F1-F8 | F1: weekly rows only for weeks fully inside the Analytics window (`toWeeks(rows, firstMondayOnOrAfter(windowStart))`), Reach-only weeks dropped, and weeks without Reach data are upserted without `impressions`/`ctr_pct` so a manual Studio value is never nulled. F2: `mapReach` sums lines per (video, date), CTR impression-weighted. F3: `scheduled` logs a non-ok cron status, the callback logs the error message only; `yt=no-channel` / `no-refresh-token` with Polish toasts. F4: `AbortSignal.timeout` 20 s on Google calls, 60 s on report downloads. F5: left open, fixtures to be replaced after the first real sync (3.8 stays open). F6: the post-connect sync runs in `ctx.waitUntil` after the redirect. F7: random nonce in an `HttpOnly; Secure; SameSite=Lax` cookie (`yt_nonce`, path `/api/yt`, 10 min) and in the signed state, compared in the callback. F8: reconnect is a `.btn` (44 px), errors mapped to Polish (`syncErrorPl`) with the raw text only in a detail line on the card |
 | F10 small fixes | All applied; synced weeks keep earning XP; t23/t24 kept, alerts suppressed |
+| Phase 7 traffic query shape | Per-video calls behind `g.trafficSources` / `g.searchTerms` (`google.ts`). The API docs do accept `filters=video==a,b` (≤ 500 ids), but `video` is not a dimension of the traffic-source report, so a list would sum the videos into one row and lose the per-video shares we need. One call per channel is therefore not possible; switching later only means changing that helper. Search terms are queried only when `YT_SEARCH` has views |
+| Phase 7 subrequest budget | Workers Paid (10,000 subrequests, 30 s CPU). `MAX_TRAFFIC_VIDEOS = 40` per integration per daily run, newest first among uploads of the last 90 days (80 Analytics calls; with up to 40 Reporting downloads and the Supabase writes still a few hundred per integration, far below the limit). Lower to 8 on Workers Free. Videos beyond the cap are not covered (no rotation; a channel has a handful of films today) |
+| Phase 7 hourly run | Per integration: token refresh, uploads playlist derived from the channel id (`UC…` → `UU…`, saves `channels.list`; falls back to `channels.list`), `playlistItems` (≤ 3 pages) for publish dates, `videos.list` in chunks of 50. `taken_at` = current hour, upserted, so a retry is idempotent. Rows older than 14 days are removed through the service-role client. Hourly errors appear in the cron response only and do not touch `last_error` (that stays the daily sync status) |
+| Phase 7 cron routing | `worker.ts` sends `x-cron-kind: hourly` when `controller.cron` equals `30 * * * *` (constant must match `wrangler.jsonc`), otherwise `daily`; `/api/cron` treats a missing header as daily |
+| Phase 7 daily traffic | Runs after the core sync; window = 28 days ending at the latest day Analytics returned (`period_end`). A traffic failure keeps the data already saved and sets `last_error = "Traffic: …"` (result `ok:false`). Older `period_end` rows of a video are removed after each write and search terms are replaced per video, so only the current window remains |
+| Phase 7 24 h counter | New view `v_views_24h`: latest snapshot per video minus the newest snapshot at least 24 h older; while less than 24 h of history exists the oldest snapshot is used and the card says "dane z ostatnich N h". This is what lets Dziś show a number after two hourly runs (manual row 7.7) |
+| Phase 7 UI | "Ostatnie 24 h" section on Dziś (after YouTube): per project the total, the films published in the last 7 days (`content_items.publish_date`), and a collapsed `<details>` per video with traffic-source shares and the top 10 search terms. Groups: Sugerowane = `RELATED_VIDEO`, Wyszukiwarka = `YT_SEARCH`, Przeglądanie = `SUBSCRIBER`, Zewnętrzne = `EXT_URL`, `NO_LINK_EMBEDDED`, `NO_LINK_OTHER`, Playlisty = `PLAYLIST`, Inne = the rest (assumption: Studio "Channel pages" lands in Inne) |
+| Phase 7 migration | `20261028100000_traffic_and_snapshots.sql`: three new tables, one new view, owner-read RLS, `authenticated` has `select` only. Strictly additive; written, not applied. **Must be applied before the PR is merged**: `loadAll` now reads the three tables and `v_views_24h`, and the live app would show a load error without them |
+| Phase 7 fixtures | `yt-traffic.json`, `yt-search-terms.json`, `yt-stats.json` are hand-written from the documented response shapes (no OAuth token to capture real calls). Assumptions to check on the first real daily and hourly runs: the traffic query returns one row per source type with `views, estimatedMinutesWatched`; search-term rows are `[term, views]`; hidden like/comment counts are absent from `statistics`; `videoPublishedAt` is present on `playlistItems` (otherwise no video counts as recent). Manual rows 7.6 and 7.7 stay open |
+| Phase 7 review F1-F9 | F1: hourly failures logged, "stan z" when the newest snapshot is over 3 h old. F2: explicit cron map, unknown kind rejected (400). F3: search terms aggregated by trimmed term. F4: traffic errors continue per video, own Polish message, no reconnect emphasis. F5/F6: span label whenever not 24 h (largest span), only the newest snapshot time summed. F7: Dziś breakdown limited to films of the last 7 days (the full per-video list still has no project view; deferred). F8: playlist paging stops at the 90-day cutoff, two more mapping tests. F9: 7.1 open until the migration is applied |
 
 ## Progress
 
@@ -502,7 +583,7 @@ Delegated to the agent per Rafał's working rules (non-UI decisions are the agen
 
 #### Manual
 
-- [ ] 3.6 OAuth client in Google Cloud, secrets in CF, Slowfall connected
+- [x] 3.6 OAuth client in Google Cloud, secrets in CF, Slowfall connected — confirmed: Slowfall Scenes and Contents May Vary connected 2026-10-26
 - [ ] 3.7 [API] weeks match Studio (±5%)
 - [ ] 3.8 Per-video CTR and the CTR < 3% alert match Studio
 
@@ -547,3 +628,19 @@ Delegated to the agent per Rafał's working rules (non-UI decisions are the agen
 
 - [ ] 6.6 Real CSV imported, totals match DistroKid Bank
 - [ ] 6.7 Re-import does not change totals
+
+
+### Phase 7: Traffic sources, search terms and hourly views
+
+#### Automated
+
+- [x] 7.1 Traffic and snapshot migration applies cleanly, authenticated read-only — applied 2026-10-28 by orchestrator; authenticated select yes / insert no, anon none
+- [x] 7.2 YouTube mapping integration test passes (traffic, search terms, stats) — f199017
+- [x] 7.3 Type checking passes — f199017
+- [x] 7.4 Linting passes — f199017
+- [x] 7.5 OpenNext build passes — f199017
+
+#### Manual
+
+- [ ] 7.6 Traffic shares and search terms match Studio for film #1
+- [ ] 7.7 Dziś shows a 24 h view count after two hourly runs
