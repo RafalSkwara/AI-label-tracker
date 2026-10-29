@@ -17,6 +17,7 @@ export default function AppNav({ can, email }: { can: (role: AppRole) => boolean
         ))}
       </div>
       <div className="account">
+        <Link href="/haslo" className="linkbtn">Hasło</Link>
         <button className="linkbtn" onClick={() => supabase().auth.signOut()} title={email}>Wyloguj</button>
       </div>
     </nav>

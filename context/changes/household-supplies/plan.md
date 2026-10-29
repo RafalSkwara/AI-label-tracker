@@ -448,6 +448,7 @@ Made by the planner on 2026-10-29 (owner asked for no questions; non-UI technica
 | D21 | Seed descriptions | Tab descriptions from the prototype tags ("niezbędne, niedrogie", "droższe, bardzo przydatne"); `details` null | Brief: details empty |
 | D22 | Tests | One E2E test (two contexts: admin + `zapasy`-only) in `smoke.spec.ts`; no unit/RLS tests | Owner override |
 | D23 | Delivery | One branch, one commit per phase, one PR at the end; both migrations + seed applied before merge | Brief: small commits per phase; both migrations are additive |
+| D24 | Phase 1–2 implementation notes | Pages `/`, `/admin/uzytkownicy`, `/haslo` are client components (the Shell takes a render-function child, which a server component cannot pass). Session logic lives in `src/shell/useSession.ts` (shared by Shell and `/haslo`); `requireRole` shares a private `callerDb` helper with `requireOwner`; invite/link routes share `src/lib/server/adminLink.ts`. Progress rows are ticked in a small docs commit after each phase commit (a commit cannot contain its own sha). Coder branch is `hs-impl-12b` because `hs-impl-12` is checked out in another worktree | Mechanical consequences of the plan, no behaviour change |
 
 ## Progress
 
@@ -458,10 +459,10 @@ Made by the planner on 2026-10-29 (owner asked for no questions; non-UI technica
 #### Automated
 
 - [ ] 1.1 Migration applies cleanly via `apply_migration` and `select role from user_roles` returns exactly `admin`, `dashboard` for the single existing user
-- [ ] 1.2 Type checking passes: `npm run typecheck`
-- [ ] 1.3 Linting passes: `npm run lint`
-- [ ] 1.4 Integration tests pass: `npm run test:int`
-- [ ] 1.5 OpenNext build passes: `npm run build`
+- [x] 1.2 Type checking passes: `npm run typecheck` — 898e7ca
+- [x] 1.3 Linting passes: `npm run lint` — 898e7ca
+- [x] 1.4 Integration tests pass: `npm run test:int` — 898e7ca
+- [x] 1.5 OpenNext build passes: `npm run build` — 898e7ca
 
 #### Manual
 

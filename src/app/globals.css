@@ -189,7 +189,21 @@ body{padding-top:max(20px, env(safe-area-inset-top, 0px));padding-bottom:max(48p
 .appnav .sections a{display:flex;align-items:center;min-height:44px;padding:0 14px;color:var(--muted);font-weight:500;text-decoration:none;white-space:nowrap;border-bottom:2px solid transparent;margin-bottom:-1px}
 .appnav .sections a[aria-current="page"]{color:var(--ink);border-color:var(--accent)}
 .appnav .account{display:flex;align-items:center;gap:14px;flex:none}
-.appnav .account .linkbtn{min-height:44px;padding:0 4px}
+.appnav .account .linkbtn{min-height:44px;padding:0 4px;display:inline-flex;align-items:center}
+
+/* admin panel */
+.usercard,.linkcard{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;display:grid;gap:10px}
+.usercard .head{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.usercard .mail{overflow-wrap:anywhere}
+.roleboxes{display:flex;flex-wrap:wrap;gap:4px 16px}
+.rolebox{display:flex;align-items:center;gap:8px;min-height:44px;cursor:pointer}
+.rolebox input{width:20px;height:20px;accent-color:var(--accent)}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.row .btn{min-height:44px;display:inline-flex;align-items:center;text-decoration:none;color:inherit}
+.row .btn.primary{color:var(--accent-ink)}
+.row .btn.danger{color:var(--bad)}
+.row .btn.danger.armed{color:#fff}
+.linkcard input{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-family:var(--f-mono);font-size:.8rem}
 
 /* dzis */
 .today{display:grid;gap:14px}
