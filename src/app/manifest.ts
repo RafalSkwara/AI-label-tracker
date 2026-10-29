@@ -2,9 +2,9 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Tracker Wydawnictwa",
-    short_name: "Tracker",
-    description: "Zadania, pipeline, KPI i koszty kanałów Wydawnictwa",
+    name: "Side Hustle Assistant",
+    short_name: "Side Hustle",
+    description: "Asystent projektów side hustle: alerty, YouTube, zadania, KPI i koszty",
     start_url: "/",
     display: "standalone",
     background_color: "#f2f5f3",

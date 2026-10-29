@@ -113,8 +113,8 @@ export default function Tracker({ email }: { email: string }) {
     <div className="wrap">
       <header className="top">
         <div>
-          <h1>Tracker Wydawnictwa</h1>
-          <p className="sub">Faza F1 · walidacja sceny sezonowe · 12 tygodni od 24.10.2026</p>
+          <h1>Side Hustle Assistant</h1>
+          <p className="sub">{data?.projects.filter((p) => p.status === "aktywny").map((p) => p.name).join(" · ") || "Projekty"}</p>
         </div>
         <div className="conn">
           <span className={"dot " + (error ? "off" : busy ? "busy" : "on")} />
