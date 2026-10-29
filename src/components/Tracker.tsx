@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { archiveRow, loadAll, saveRow, saveSettings, setTaskDone } from "@/lib/data";
 import { daysTo, dfmt, dmy, inDays, nf, num, pln, today } from "@/lib/format";
 import { XP_PER_LEVEL, badges, costTotals, levelName, levelOf, monthly, streak, totalHours, totalSubs, trend, weeksAgg, xpTotal } from "@/lib/game";
-import { supabase } from "@/lib/supabase";
 import type { Coll, Data, Item, Settings, Sub, Task, Week } from "@/lib/types";
 import { type Alert, alerts } from "@/lib/rules";
 import RoyaltiesPanel from "./RoyaltiesPanel";
@@ -120,7 +119,6 @@ export default function Tracker({ email }: { email: string }) {
           <span className={"dot " + (error ? "off" : busy ? "busy" : "on")} />
           <span>{error ? "Błąd bazy" : busy ? "Synchronizacja…" : "Supabase"}</span>
           <button className="linkbtn" onClick={load}>Odśwież</button>
-          <button className="linkbtn" onClick={() => supabase().auth.signOut()} title={email}>Wyloguj</button>
         </div>
       </header>
 

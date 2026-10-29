@@ -3,10 +3,9 @@
 import { useEffect, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
-import Login from "./Login";
-import Tracker from "./Tracker";
 
-export default function App() {
+/** Supabase session: undefined while loading, null when signed out */
+export function useSession(): Session | null | undefined {
   const [session, setSession] = useState<Session | null | undefined>(undefined);
 
   useEffect(() => {
@@ -20,7 +19,5 @@ export default function App() {
     return () => data.subscription.unsubscribe();
   }, []);
 
-  if (session === undefined) return <div className="wrap"><p className="sub">Wczytywanie…</p></div>;
-  if (!session) return <Login />;
-  return <Tracker email={session.user.email ?? ""} />;
+  return session;
 }

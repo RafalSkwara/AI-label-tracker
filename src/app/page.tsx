@@ -1,5 +1,8 @@
-import App from "@/components/App";
+"use client";
+
+import Tracker from "@/components/Tracker";
+import Shell from "@/shell/Shell";
 
 export default function Page() {
-  return <App />;
+  return <Shell need="dashboard">{({ email }) => <Tracker email={email} />}</Shell>;
 }

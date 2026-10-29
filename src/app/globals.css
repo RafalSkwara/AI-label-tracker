@@ -183,6 +183,14 @@ body{padding-top:max(20px, env(safe-area-inset-top, 0px));padding-bottom:max(48p
 .login form{display:grid;gap:10px}
 .userbar{display:flex;gap:10px;align-items:center}
 
+/* app shell nav */
+.appnav{max-width:1080px;margin:0 auto 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:1px solid var(--line)}
+.appnav .sections{display:flex;gap:4px;overflow-x:auto;min-width:0}
+.appnav .sections a{display:flex;align-items:center;min-height:44px;padding:0 14px;color:var(--muted);font-weight:500;text-decoration:none;white-space:nowrap;border-bottom:2px solid transparent;margin-bottom:-1px}
+.appnav .sections a[aria-current="page"]{color:var(--ink);border-color:var(--accent)}
+.appnav .account{display:flex;align-items:center;gap:14px;flex:none}
+.appnav .account .linkbtn{min-height:44px;padding:0 4px}
+
 /* dzis */
 .today{display:grid;gap:14px}
 .alerts,.gates{display:grid;gap:8px}
