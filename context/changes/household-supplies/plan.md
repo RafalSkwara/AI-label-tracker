@@ -492,10 +492,10 @@ Made by the planner on 2026-10-29 (owner asked for no questions; non-UI technica
 #### Automated
 
 - [ ] 3.1 Migration applies cleanly via `apply_migration`; `select tablename from pg_publication_tables where pubname = 'supabase_realtime'` lists `supply_tabs` and `supply_items`
-- [ ] 3.2 Type checking passes: `npm run typecheck`
-- [ ] 3.3 Linting passes, including the import boundary: `npm run lint`
-- [ ] 3.4 Integration tests pass: `npm run test:int`
-- [ ] 3.5 OpenNext build passes: `npm run build`
+- [x] 3.2 Type checking passes: `npm run typecheck` — fcd6ca1
+- [x] 3.3 Linting passes, including the import boundary: `npm run lint` — fcd6ca1
+- [x] 3.4 Integration tests pass: `npm run test:int` — fcd6ca1
+- [x] 3.5 OpenNext build passes: `npm run build` — fcd6ca1
 
 #### Manual
 
@@ -509,9 +509,9 @@ Made by the planner on 2026-10-29 (owner asked for no questions; non-UI technica
 
 #### Automated
 
-- [ ] 4.1 `npm run seed:supplies:sql` regenerates an identical `supabase/seed/supplies_seed.sql` (`git diff --exit-code`)
+- [x] 4.1 `npm run seed:supplies:sql` regenerates an identical `supabase/seed/supplies_seed.sql` (`git diff --exit-code`) — 3f9057d
 - [ ] 4.2 After running the SQL: `select count(*) from supply_tabs` = 2, active items = 51, removed = 19; running it a second time inserts 0 rows
-- [ ] 4.3 Type checking, lint, test:int and build pass: `npm run typecheck && npm run lint && npm run test:int && npm run build`
+- [x] 4.3 Type checking, lint, test:int and build pass: `npm run typecheck && npm run lint && npm run test:int && npm run build` — 3f9057d
 
 #### Manual
 
