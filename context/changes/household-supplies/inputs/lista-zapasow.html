@@ -1,0 +1,395 @@
+<title>Domowe zapasy kryzysowe</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;800&family=Atkinson+Hyperlegible:wght@400;700&display=swap">
+<style>
+/* Layout: one narrow column; sticky summary strip, then category groups of checkable rows with editable prices and a remove control. */
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --ink: #17263b;
+  --muted: #5d6a7c;
+  --line: #dde2e9;
+  --accent: #c2410c;
+  --accent-soft: #fde7da;
+  --done: #2f7d4f;
+  --done-soft: #e3f2e8;
+  --f-display: "Archivo", "Arial Narrow", system-ui, sans-serif;
+  --f-body: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1621; --surface: #172131; --ink: #e6ebf2; --muted: #9aa7b8; --line: #2a3648;
+    --accent: #fb8a4c; --accent-soft: #3a2418; --done: #6cc08f; --done-soft: #163024; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1621; --surface: #172131; --ink: #e6ebf2; --muted: #9aa7b8; --line: #2a3648;
+  --accent: #fb8a4c; --accent-soft: #3a2418; --done: #6cc08f; --done-soft: #163024; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+.wrap { max-width: 760px; margin: 0 auto; padding-block: 28px 64px; display: grid; gap: 20px; }
+h1 { font-family: var(--f-display); font-weight: 800; font-size: clamp(26px, 6vw, 36px); line-height: 1.1; margin: 0; text-wrap: balance; }
+.lead { margin: 6px 0 0; color: var(--muted); max-width: 62ch; }
+.note { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; font-size: 14px; }
+.note b { color: var(--accent); }
+.summary {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg);
+  padding-block: 10px; border-bottom: 1px solid var(--line); display: grid; gap: 10px;
+}
+.stats { display: flex; flex-wrap: wrap; gap: 8px 22px; font-variant-numeric: tabular-nums; }
+.stat span { display: block; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.stat strong { font-family: var(--f-display); font-size: 18px; font-weight: 600; }
+.bar { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.bar i { display: block; height: 100%; width: 0; background: var(--done); transition: width .3s; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.chip {
+  font: inherit; font-size: 13px; border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+  border-radius: 999px; padding: 5px 12px; cursor: pointer;
+}
+.chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.sync { margin-left: auto; font-size: 12px; color: var(--muted); }
+.tier { display: grid; gap: 14px; }
+.tier-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
+.tier-head h2 { font-family: var(--f-display); font-size: 21px; margin: 0; }
+.tag { font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; background: var(--accent-soft); color: var(--accent); }
+.tier-sum { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.group { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.group h3 { margin: 0; padding: 9px 14px; font-size: 12px; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); border-bottom: 1px solid var(--line); }
+.row { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto 28px; gap: 10px; align-items: start; padding: 10px 10px 10px 14px; border-top: 1px solid var(--line); }
+.group h3 + .row { border-top: 0; }
+.row input[type="checkbox"] { width: 18px; height: 18px; margin: 2px 0 0; accent-color: var(--done); cursor: pointer; }
+.row label { cursor: pointer; min-width: 0; }
+.name { font-weight: 700; }
+.qty { color: var(--muted); font-size: 13px; }
+.price-btn {
+  font: inherit; font-size: 14px; background: none; border: 1px dashed transparent; color: var(--ink);
+  border-radius: 6px; padding: 1px 6px; cursor: pointer; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums;
+}
+.price-btn:hover { border-color: var(--line); }
+.price-btn small { display: block; color: var(--muted); font-size: 12px; }
+.price-btn .own { color: var(--accent); font-size: 11px; display: block; }
+.price-edit { display: flex; align-items: center; gap: 4px; }
+.price-edit input {
+  width: 84px; font: inherit; font-size: 14px; padding: 3px 6px; border: 1px solid var(--accent); border-radius: 6px;
+  background: var(--surface); color: var(--ink); text-align: right; font-variant-numeric: tabular-nums;
+}
+.icon-btn {
+  font: inherit; width: 28px; height: 28px; border: 0; border-radius: 6px; background: none; color: var(--muted);
+  cursor: pointer; font-size: 18px; line-height: 1;
+}
+.icon-btn:hover { background: var(--accent-soft); color: var(--accent); }
+.row.is-done { background: var(--done-soft); }
+.row.is-done .name { text-decoration: line-through; text-decoration-color: var(--done); }
+.hide-done .row.is-done { display: none; }
+.removed { display: grid; gap: 8px; }
+.removed h2 { font-family: var(--f-display); font-size: 17px; margin: 8px 0 0; }
+.removed-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.restore { font: inherit; font-size: 13px; border: 1px dashed var(--line); background: none; color: var(--muted); border-radius: 6px; padding: 4px 10px; cursor: pointer; }
+.restore:hover { color: var(--ink); border-color: var(--muted); }
+.foot { font-size: 13px; color: var(--muted); }
+@media (max-width: 480px) { .sync { margin-left: 0; width: 100%; } }
+@media (prefers-reduced-motion: reduce) { .bar i { transition: none; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Domowe zapasy kryzysowe</h1>
+    <p class="lead">Lista dla 2 dorosłych i Bruna (6 lat): szeregowiec pod miastem, kocioł gazowy, auto w dieslu. Cel to 7–14 dni samodzielności. Ceny są orientacyjne, z jesieni 2026. Kliknij cenę, żeby wpisać własną, a ×, żeby usunąć pozycję.</p>
+  </header>
+
+  <div class="note"><b>Kocioł jest już na wtyczce</b>, więc w blackoucie wystarczy go przełączyć do stacji zasilania z czystą sinusoidą. Dlatego stacja otwiera listę B.</div>
+
+  <div class="summary" id="summary">
+    <div class="stats">
+      <div class="stat"><span>Kupione</span><strong id="sCount">0 / 0</strong></div>
+      <div class="stat"><span>Wydane (szac.)</span><strong id="sSpent">0 zł</strong></div>
+      <div class="stat"><span>Zostało (szac.)</span><strong id="sLeft">0 zł</strong></div>
+    </div>
+    <div class="bar"><i id="sBar"></i></div>
+    <div class="controls">
+      <button class="chip" id="fAll" aria-pressed="true" type="button">Wszystko</button>
+      <button class="chip" id="fA" aria-pressed="false" type="button">A: niezbędne</button>
+      <button class="chip" id="fB" aria-pressed="false" type="button">B: droższe</button>
+      <button class="chip" id="fHide" aria-pressed="false" type="button">Ukryj kupione</button>
+      <span class="sync" id="sync">Zapis w tej przeglądarce</span>
+    </div>
+  </div>
+
+  <main id="list"></main>
+
+  <section class="removed" id="removed" hidden>
+    <h2>Usunięte z listy</h2>
+    <div class="removed-list" id="removedList"></div>
+  </section>
+
+  <p class="foot">Wodę i jedzenie zużywaj na bieżąco i uzupełniaj (zasada „pierwsze weszło, pierwsze wyszło”). Olej napędowy w kanistrze wymieniaj co 6–12 miesięcy, zimą tylko zimowy. Promiennik i kuchenkę gazową używaj wyłącznie z czujnikiem czadu i uchylonym oknem.</p>
+</div>
+
+<script>
+const ITEMS = [
+  // A — niezbędne
+  ["a","Woda","w1","Woda butelkowana","16 × 5 l (ok. 80 l na 7 dni)",65,95],
+  ["a","Woda","w2","Kanistry na wodę 20 l","2 szt., do napełnienia przy alercie",80,160],
+  ["a","Woda","w3","Tabletki do uzdatniania wody","1 opak. (50 szt.)",30,50],
+  ["a","Jedzenie na 14 dni","j1","Konserwy mięsne i rybne","ok. 20 puszek",120,200],
+  ["a","Jedzenie na 14 dni","j2","Gotowe dania w słoikach lub puszkach","ok. 10 szt.",80,150],
+  ["a","Jedzenie na 14 dni","j3","Makaron, ryż, kasze","ok. 8 kg",50,80],
+  ["a","Jedzenie na 14 dni","j4","Płatki owsiane, musli","ok. 3 kg",25,40],
+  ["a","Jedzenie na 14 dni","j5","Mleko UHT","12 l",40,60],
+  ["a","Jedzenie na 14 dni","j6","Masło orzechowe, miód, dżemy","po 2–3 słoiki",40,70],
+  ["a","Jedzenie na 14 dni","j7","Orzechy, bakalie, batony","zapas na 2 tygodnie",60,100],
+  ["a","Jedzenie na 14 dni","j8","Ulubione przekąski i soczki Bruna","musy, krakersy, soczki w kartonikach",50,80],
+  ["a","Jedzenie na 14 dni","j9","Kawa, herbata, cukier, sól","",40,70],
+  ["a","Gotowanie bez prądu","g1","Kuchenka turystyczna na kartusze","1 szt.",80,150],
+  ["a","Gotowanie bez prądu","g2","Kartusze gazowe","10 szt.",100,150],
+  ["a","Gotowanie bez prądu","g3","Zapałki sztormowe i zapalniczki","",15,25],
+  ["a","Ciepło","c1","Bielizna termoaktywna","3 komplety, w tym jeden dla Bruna",150,300],
+  ["a","Ciepło","c2","Koce polarowe","3 szt.",60,120],
+  ["a","Ciepło","c3","Folie NRC (koce ratunkowe)","6 szt., także na okna",20,40],
+  ["a","Ciepło","k1","Promiennik gazowy do wnętrz z czujnikiem tlenu","na butlę 11 kg; tylko z czujnikiem czadu i uchylonym oknem",250,250],
+  ["a","Ciepło","k2","Butla propan 11 kg, pełna","nowa butla z gazem; potem wymiana ok. 110–150 zł",300,400],
+  ["a","Ciepło","k4","Reduktor i wąż gazowy","jeśli nie ma ich w zestawie z promiennikiem",40,70],
+  ["a","Ciepło","k3","Śpiwory turystyczne","3 szt., w tym dziecięcy; pod kocem wystarczą w zimnym domu",250,500],
+  ["a","Światło i łączność","s1","Czołówki","3 szt., w tym dziecięca",90,180],
+  ["a","Światło i łączność","s2","Latarka LED","1 szt.",40,80],
+  ["a","Światło i łączność","s3","Baterie AA i AAA","ok. 40 szt.",60,100],
+  ["a","Światło i łączność","s4","Radio na baterie i korbkę z USB","komunikaty Polskiego Radia",100,200],
+  ["a","Światło i łączność","s5","Powerbanki 20 000 mAh","2 szt.",160,300],
+  ["a","Zdrowie","z1","Apteczka rozszerzona","opatrunki, bandaże, nożyczki, rękawiczki",80,150],
+  ["a","Zdrowie","z2","Leki stałe domowników","zapas na miesiąc",null,null,"wg recepty"],
+  ["a","Zdrowie","z3","Leki przeciwbólowe i przeciwgorączkowe","dla dorosłych i zawiesina dla 6-latka",40,70],
+  ["a","Zdrowie","z4","Elektrolity, węgiel, leki na biegunkę","",30,50],
+  ["a","Zdrowie","z5","Termometr","",20,40],
+  ["a","Zdrowie","z6","Maseczki FFP2","10 szt.",20,40],
+  ["a","Higiena","h1","Mocne worki 120 l i żwirek","awaryjna toaleta",40,60],
+  ["a","Higiena","h2","Chusteczki nawilżane i żel antybakteryjny","",30,50],
+  ["a","Higiena","h3","Papier toaletowy","zapas na 2 tygodnie",30,50],
+  ["a","Bezpieczeństwo","b1","Czujnik czadu i dymu (2 w 1) do sypialni","1 szt., taki jak przy piecu",80,150],
+  ["a","Bezpieczeństwo","b2","Czujnik dymu","2 szt.",50,100],
+  ["a","Bezpieczeństwo","b3","Gaśnica proszkowa 2 kg","",80,120],
+  ["a","Bezpieczeństwo","b4","Koc gaśniczy","",30,50],
+  ["a","Gotówka i dokumenty","d1","Gotówka w drobnych nominałach","wydatki na ok. 2 tygodnie",null,null,"własne środki"],
+  ["a","Gotówka i dokumenty","d2","Wodoodporna teczka i pendrive","kopie dowodów, aktu urodzenia Bruna, polis",40,70],
+  ["a","Gotówka i dokumenty","d3","Papierowa mapa okolicy i lista telefonów","",20,35],
+  ["a","Auto","a1","Homologowany kanister 20 l na olej napędowy","",50,100],
+  ["a","Auto","a2","Olej napędowy zimowy","20 l, rotować co 6–12 mies.",120,150],
+  ["a","Plecaki ewakuacyjne","p1","Plecaki ewakuacyjne","2 × 30–40 l i mniejszy dla Bruna",150,400],
+  ["a","Plecaki ewakuacyjne","p2","Wyposażenie plecaka Bruna","karta z imieniem i telefonami rodziców, gwizdek, opaska odblaskowa",15,30],
+  ["a","Plecaki ewakuacyjne","p3","Książeczka, mała gra, ulubiona zabawka","na stres i nudę",20,50],
+  ["a","Analogowe i domowe","n1","Podgrzewacze (tealighty) i świece długiego palenia","ok. 100 podgrzewaczy i 6 świec",40,80],
+  ["a","Analogowe i domowe","n2","Szklane lampiony lub osłony na świece","2–3 szt., stabilne, z dala od Bruna",30,70],
+  ["a","Analogowe i domowe","n3","Lampa kempingowa LED na baterie","oświetla cały pokój, bezpieczniejsza od świec",50,100],
+  ["a","Analogowe i domowe","n4","Termofory gumowe","3 szt., grzeją w nocy bez prądu",45,90],
+  ["a","Analogowe i domowe","n5","Termosy 1–1,5 l","2 szt., trzymają wrzątek z kuchenki",80,160],
+  ["a","Analogowe i domowe","n6","Ręczny otwieracz do puszek","bez niego konserwy są bezużyteczne",15,30],
+  ["a","Analogowe i domowe","n7","Multitool, taśma srebrna, sznurek","drobne naprawy, uszczelnianie okien",60,120],
+  ["a","Analogowe i domowe","n8","Grubsza folia malarska i taśma","ocieplenie okien, zasłonięcie przeciągów",30,60],
+  ["a","Analogowe i domowe","n9","Rękawice robocze","2 pary",20,30],
+  ["a","Analogowe i domowe","n10","Talerze, kubki i sztućce jednorazowe","oszczędzają wodę na zmywanie",30,50],
+  ["a","Analogowe i domowe","n11","Ładowarka samochodowa USB","auto jako ładowarka do telefonów",30,60],
+  ["a","Analogowe i domowe","n12","Budzik lub zegarek na baterie","",30,60],
+  ["a","Analogowe i domowe","n13","Gry planszowe, karty, kredki, książki","zajęcie dla Bruna i dorosłych bez ekranów",50,150],
+  ["a","Analogowe i domowe","n14","Notes, długopisy, ołówki","lista kontaktów i notatki z komunikatów",10,20],
+  ["a","Analogowe i domowe","n15","Wiadro z pokrywą","woda techniczna albo awaryjna toaleta",20,40],
+  // B — droższe, bardzo przydatne
+  ["b","Prąd","e1","Stacja zasilania 1–2 kWh, czysty sinus","utrzyma kocioł ok. 10–20 h oraz lodówkę i router",3000,7000],
+  ["b","Prąd","e2","Panel solarny 200–400 W","ładowanie stacji przy dłuższej awarii",800,2000],
+  ["b","Prąd","e3","Przetwornica 12 V/230 V, czysty sinus","auto jako generator, silnik pracuje na zewnątrz",300,800],
+  ["b","Prąd","e4","Agregat inwerterowy 2 kW i kanister na benzynę","tylko na zewnątrz, z dala od okien",2500,5000],
+  ["b","Woda i jedzenie","x1","Filtr do wody (np. Sawyer, Katadyn)","",200,800],
+  ["b","Woda i jedzenie","x2","Zamrażarka skrzyniowa","sens tylko ze stacją lub agregatem",1000,1800],
+  ["b","Łączność","r1","Krótkofalówki PMR","2–3 szt.",150,300]
+].map(([tier,cat,id,name,qty,min,max,label]) => ({tier,cat,id,name,qty,min,max,label}));
+const BY_ID = Object.fromEntries(ITEMS.map(i => [i.id, i]));
+
+const LS_KEY = "zapasy-state-v2";
+// state: checked {id:true}, prices {id:number} (own price), removed {id:true}
+let state = { checked: {}, prices: {}, removed: {} };
+let filter = "all";
+let hideDone = false;
+let editing = null;
+let docRef = null, writeTimer = null, writing = Promise.resolve();
+
+function normalize(s) {
+  s = s || {};
+  return { checked: { ...(s.checked || {}) }, prices: { ...(s.prices || {}) }, removed: { ...(s.removed || {}) } };
+}
+try {
+  const saved = localStorage.getItem(LS_KEY) || localStorage.getItem("zapasy-checked-v1");
+  if (saved) { const p = JSON.parse(saved); state = normalize(p && p.checked !== undefined ? p : { checked: p }); }
+} catch (e) {}
+
+const zl = n => n.toLocaleString("pl-PL") + " zł";
+const range = (a, b) => a === b ? zl(a) : a.toLocaleString("pl-PL") + "–" + zl(b);
+const esc = s => s.replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));
+
+// Effective price: own price wins over the estimate range; null when unpriced.
+function eff(i) {
+  const own = state.prices[i.id];
+  if (typeof own === "number") return { min: own, max: own, own: true };
+  if (i.min != null) return { min: i.min, max: i.max, own: false };
+  return null;
+}
+const active = i => !state.removed[i.id];
+const sumOf = items => items.reduce((s, i) => { const p = eff(i); if (p) { s[0] += p.min; s[1] += p.max; } return s; }, [0, 0]);
+
+function priceCell(i) {
+  if (editing === i.id) {
+    const v = typeof state.prices[i.id] === "number" ? state.prices[i.id] : "";
+    return `<div class="price-edit"><input type="number" min="0" step="1" inputmode="decimal" id="price-${i.id}" data-price="${i.id}" value="${v}" placeholder="${i.min != null ? i.min : "zł"}" aria-label="Twoja cena w zł"><span>zł</span></div>`;
+  }
+  const p = eff(i);
+  const text = p ? range(p.min, p.max) : `<small>${esc(i.label || "dodaj cenę")}</small>`;
+  return `<button type="button" class="price-btn" data-edit="${i.id}" title="Zmień cenę">${text}${p && p.own ? `<span class="own">Twoja cena</span>` : ""}</button>`;
+}
+
+function render() {
+  const list = document.getElementById("list");
+  const tiers = [
+    {key:"a", title:"Lista A", tag:"niezbędne, niedrogie"},
+    {key:"b", title:"Lista B", tag:"droższe, bardzo przydatne"}
+  ];
+  let html = "";
+  for (const t of tiers) {
+    if (filter !== "all" && filter !== t.key) continue;
+    const items = ITEMS.filter(i => i.tier === t.key && active(i));
+    const [sMin, sMax] = sumOf(items);
+    html += `<section class="tier"><div class="tier-head"><h2>${t.title}</h2><span class="tag">${t.tag}</span><span class="tier-sum">razem ok. ${range(sMin, sMax)}</span></div>`;
+    const cats = [...new Set(items.map(i => i.cat))];
+    for (const c of cats) {
+      html += `<div class="group"><h3>${esc(c)}</h3>`;
+      for (const i of items.filter(x => x.cat === c)) {
+        const done = !!state.checked[i.id];
+        html += `<div class="row${done ? " is-done" : ""}">
+          <input type="checkbox" id="cb-${i.id}" data-id="${i.id}"${done ? " checked" : ""}>
+          <label for="cb-${i.id}"><div class="name">${esc(i.name)}</div>${i.qty ? `<div class="qty">${esc(i.qty)}</div>` : ""}</label>
+          ${priceCell(i)}
+          <button type="button" class="icon-btn" data-remove="${i.id}" aria-label="Usuń z listy: ${esc(i.name)}" title="Usuń z listy">×</button></div>`;
+      }
+      html += `</div>`;
+    }
+    html += `</section>`;
+  }
+  list.innerHTML = html;
+  list.classList.toggle("hide-done", hideDone);
+
+  const removed = ITEMS.filter(i => !active(i));
+  document.getElementById("removed").hidden = removed.length === 0;
+  document.getElementById("removedList").innerHTML = removed.map(i =>
+    `<button type="button" class="restore" data-restore="${i.id}" title="Przywróć na listę">↺ ${esc(i.name)}</button>`).join("");
+
+  renderSummary();
+  if (editing) { const el = document.getElementById("price-" + editing); if (el) { el.focus(); el.select(); } }
+}
+
+function renderSummary() {
+  const pool = ITEMS.filter(i => active(i) && (filter === "all" || i.tier === filter));
+  const done = pool.filter(i => state.checked[i.id]);
+  const [spentMin, spentMax] = sumOf(done);
+  const [leftMin, leftMax] = sumOf(pool.filter(i => !state.checked[i.id]));
+  document.getElementById("sCount").textContent = `${done.length} / ${pool.length}`;
+  document.getElementById("sSpent").textContent = spentMax ? range(spentMin, spentMax) : "0 zł";
+  document.getElementById("sLeft").textContent = leftMax ? range(leftMin, leftMax) : "0 zł";
+  document.getElementById("sBar").style.width = pool.length ? (done.length / pool.length * 100) + "%" : "0";
+}
+
+function setSync(text) { document.getElementById("sync").textContent = text; }
+
+function save() {
+  try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (e) {}
+  if (!docRef) return;
+  clearTimeout(writeTimer);
+  writeTimer = setTimeout(() => {
+    const body = normalize(state);
+    writing = writing.then(() => docRef.set(body)).then(
+      () => setSync("Zapisane wspólnie"),
+      e => setSync(e && e.code === "invalid_argument" ? "Tylko do odczytu, zapis w tej przeglądarce" : "Nie udało się zapisać, spróbuj ponownie")
+    );
+  }, 700);
+}
+
+function commitPrice(id, raw) {
+  const v = String(raw).trim().replace(",", ".");
+  if (v === "") delete state.prices[id];
+  else {
+    const n = Math.round(Number(v) * 100) / 100;
+    if (Number.isFinite(n) && n >= 0) state.prices[id] = n;
+  }
+  editing = null;
+  render();
+  save();
+}
+
+const list = document.getElementById("list");
+list.addEventListener("change", e => {
+  const id = e.target.dataset && e.target.dataset.id;
+  if (!id) return;
+  if (e.target.checked) state.checked[id] = true; else delete state.checked[id];
+  e.target.closest(".row").classList.toggle("is-done", e.target.checked);
+  renderSummary();
+  save();
+});
+list.addEventListener("click", e => {
+  const edit = e.target.closest("[data-edit]");
+  if (edit) { editing = edit.dataset.edit; render(); return; }
+  const rm = e.target.closest("[data-remove]");
+  if (rm) { state.removed[rm.dataset.remove] = true; editing = null; render(); save(); }
+});
+list.addEventListener("keydown", e => {
+  if (!e.target.dataset || !e.target.dataset.price) return;
+  if (e.key === "Enter") { e.preventDefault(); commitPrice(e.target.dataset.price, e.target.value); }
+  if (e.key === "Escape") { editing = null; render(); }
+});
+list.addEventListener("focusout", e => {
+  if (e.target.dataset && e.target.dataset.price && editing === e.target.dataset.price) commitPrice(e.target.dataset.price, e.target.value);
+});
+document.getElementById("removedList").addEventListener("click", e => {
+  const b = e.target.closest("[data-restore]");
+  if (!b) return;
+  delete state.removed[b.dataset.restore];
+  render();
+  save();
+});
+
+function setFilter(f) {
+  filter = f;
+  for (const [id, v] of [["fAll","all"],["fA","a"],["fB","b"]]) document.getElementById(id).setAttribute("aria-pressed", String(f === v));
+  render();
+}
+document.getElementById("fAll").onclick = () => setFilter("all");
+document.getElementById("fA").onclick = () => setFilter("a");
+document.getElementById("fB").onclick = () => setFilter("b");
+document.getElementById("fHide").onclick = e => {
+  hideDone = !hideDone;
+  e.currentTarget.setAttribute("aria-pressed", String(hideDone));
+  list.classList.toggle("hide-done", hideDone);
+};
+
+render();
+
+(async () => {
+  let db = null;
+  try { db = window.claude && window.claude.use ? await window.claude.use("db") : null; } catch (e) { db = null; }
+  if (!db) return;
+  docRef = db.doc("lista/stan");
+  setSync("Łączenie…");
+  docRef.onSnapshot(snap => {
+    if (snap.metadata.hasPendingWrites) return;
+    if (snap.exists) {
+      state = normalize(snap.data());
+      try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (e) {}
+      if (!editing) render(); else renderSummary();
+    } else if (Object.keys(state.checked).length + Object.keys(state.prices).length + Object.keys(state.removed).length) {
+      save();
+    }
+    setSync("Zapisane wspólnie");
+  }, () => { docRef = null; setSync("Zapis w tej przeglądarce"); });
+})();
+</script>
