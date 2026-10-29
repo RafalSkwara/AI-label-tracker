@@ -89,28 +89,30 @@ Introduce roles in the database and the app shell that reads them. After this ph
 **Contract**:
 - `create type public.app_role as enum ('admin', 'dashboard', 'zapasy')`.
 - `public.user_roles (user_id uuid not null references auth.users(id) on delete cascade, role app_role not null, granted_by uuid null references auth.users(id) on delete set null default auth.uid(), granted_at timestamptz not null default now(), primary key (user_id, role))` (the PK is the unique pair).
-- `public.has_role(r app_role) returns boolean` — `language sql stable security definer set search_path = ''`: exists a `user_roles` row for `auth.uid()` with `role = r or role = 'admin'`. `revoke execute … from public, anon; grant execute … to authenticated`.
+- `public.has_role(r app_role) returns boolean` — `language sql stable security definer set search_path = ''`: exists a `user_roles` row for `auth.uid()` with `role = r or role = 'admin'`. `revoke execute … from public, anon; grant execute … to authenticated, service_role`. No recursion with the `user_roles` policies: the function runs as its owner `postgres`, which owns `user_roles` and has `rolbypassrls` (verified live), so its inner select skips RLS. Do not add `force row level security` to `user_roles`.
 - RLS on `user_roles`: `roles_read` SELECT `to authenticated using (user_id = (select auth.uid()) or (select public.has_role('admin')))`; `roles_admin_insert` INSERT `with check ((select public.has_role('admin')))`; `roles_admin_remove` DELETE `using ((select public.has_role('admin')))`. No UPDATE policy. Grants: `revoke all … from anon, authenticated; grant select, insert, delete … to authenticated`.
-- Last-admin guard: trigger function `public.user_roles_keep_admin()` (`security definer`, `search_path ''`) + `create trigger … after delete or update on public.user_roles for each row` → `raise exception 'last admin' using errcode = 'P0001', hint = 'keep_admin'` when `old.role = 'admin'` and no row with `role = 'admin'` remains.
+- Last-admin guard: trigger function `public.user_roles_keep_admin()` (`security definer`, `search_path ''`) + `create trigger … after delete or update on public.user_roles for each row` → `raise exception 'last admin' using errcode = 'P0001', hint = 'keep_admin'` when `old.role = 'admin'` and no row with `role = 'admin'` remains. The function is plpgsql (volatile) and starts with `perform pg_advisory_xact_lock(hashtext('user_roles_keep_admin'))`, so two admins removing each other in parallel transactions are serialised and the second one sees the first one's committed removal (READ COMMITTED takes a fresh snapshot per statement). `revoke execute … from public, anon, authenticated` (trigger-only).
 - First admin: `insert into public.user_roles (user_id, role, granted_by) select u.id, r.role, null from auth.users u join public.app_owners o on o.email = lower(u.email) cross join (values ('admin'::public.app_role), ('dashboard'::public.app_role)) r(role) on conflict do nothing;` then `do $$ … if not exists (admin row) then raise exception 'no owner found' … $$` so the migration aborts (and rolls back) instead of leaving the app without an admin.
 - `create or replace function public.is_owner()` — same signature, `security definer`, `search_path ''`, body `select public.has_role('dashboard')`; `comment on function` explaining it now means "may use the dashboard (dashboard or admin role)". Name kept on purpose (decision D2).
+- `create or replace` keeps the live ACL of `is_owner()` (`authenticated`, `service_role`; no `PUBLIC`, verified 2026-10-29), so no grant statements for it. The old body read the e-mail claim, the new one reads `auth.uid()` (`sub`); both are in every access token the old `main` client already holds, so no re-login.
+- Statement order inside the file: types/table/functions/policies/trigger → first-admin insert → `do $$` check → `create or replace is_owner()`. The file has no own `begin`/`commit`: `apply_migration` runs it in one transaction, so any error leaves the live DB untouched.
 - Header comment: additive, safe before merge, rollback file name.
 
 #### 2. Rollback `supabase/rollback/20261029100000_roles_down.sql`
 
 **Intent**: Return to the e-mail allow-list in one transaction.
 
-**Contract**: restore the original `is_owner()` body (`select exists (select 1 from public.app_owners o where o.email = lower(auth.jwt() ->> 'email'))`) first, then drop the trigger, trigger function, `user_roles` (policies go with it), `has_role`, `app_role`. Run via `apply_migration` only on the orchestrator's instruction. Roles granted in the meantime are lost (acceptable; documented).
+**Contract**: restore the original `is_owner()` body (`select exists (select 1 from public.app_owners o where o.email = lower(auth.jwt() ->> 'email'))`) first, then drop the trigger, trigger function, `user_roles` (policies go with it), `has_role`, `app_role`. Run via `apply_migration` only on the orchestrator's instruction. Roles granted in the meantime are lost (acceptable; documented). **Order dependency:** once migration 2 is applied, its `supply_rw` policies depend on `has_role`, so `drop function has_role` fails; roll back the supplies migration first (then this one). The file's header says so, and it uses plain `drop` (no `cascade`) so a wrong order fails loudly instead of silently removing supply policies. Users invited in the meantime keep their `auth.users` rows; the old allow-list ignores them.
 
 #### 3. App shell
 
-**File**: `src/shell/Shell.tsx`, `src/shell/useRoles.ts`, `src/shell/AppNav.tsx`, `src/shell/NoAccess.tsx`, `src/components/App.tsx` (removed; logic moves into the shell), `src/app/page.tsx`, `src/components/Tracker.tsx` (header), `src/app/globals.css`
+**File**: `src/shell/Shell.tsx`, `src/shell/useRoles.ts`, `src/shell/sections.ts`, `src/shell/AppNav.tsx`, `src/shell/NoAccess.tsx`, `src/components/App.tsx` (removed; logic moves into the shell), `src/app/page.tsx`, `src/components/Tracker.tsx` (header), `src/app/globals.css`
 
 **Intent**: One client shell owns the session (the current `App.tsx` logic), loads the user's roles, renders the main nav and guards each page by a required role, so pages only render for permitted users.
 
 **Contract**:
 - `useRoles()` → `{ roles: Set<AppRole>, can(role) }` from `select role from user_roles where user_id = <me>`; `can(r) = roles.has(r) || roles.has("admin")`. Roles load on every app start and on `onAuthStateChange` (so a change applies at the latest after a reload — brief criterion).
-- `<Shell need="dashboard" | "zapasy" | "admin" | null>{(ctx) => …}</Shell>` with `ctx = { session, email, userId, can }`. States: loading ("Wczytywanie…"), no session → `Login`, no roles at all → `NoAccess` (text: "Nie masz jeszcze dostępu. Poproś administratora." + "Wyloguj"), has roles but not `need` → client redirect (`router.replace`) to the first permitted section in order Dashboard → Zapasy → Użytkownicy; else children.
+- `<Shell need="dashboard" | "zapasy" | "admin" | null>{(ctx) => …}</Shell>` with `ctx = { session, email, userId, can }`. States: loading ("Wczytywanie…"), no session → `Login`, no roles at all → `NoAccess` (text: "Nie masz jeszcze dostępu. Poproś administratora." + "Wyloguj"), has roles but not `need` → client redirect (`router.replace`) to the first permitted section in order Dashboard → Zapasy → Użytkownicy; else children. Sections come from one `SECTIONS` array in `src/shell/sections.ts` (`{ href, label, role }`) shared by the redirect and `AppNav`; an entry is added only in the phase that ships its route (Dashboard now, Użytkownicy in phase 2, Zapasy in phase 3). If the user has roles but no permitted entry exists yet (e.g. `zapasy` only during phase 2), the shell shows `NoAccess` instead of redirecting to a missing route.
 - `AppNav`: links (next/link) only for permitted sections — "Dashboard" `/` (`dashboard`), "Użytkownicy" `/admin/uzytkownicy` (`admin`; route arrives in phase 2, the link is added there), and "Wyloguj" on the right (moved from `Tracker`'s header; "Odśwież" stays in Tracker). `aria-current="page"` on the active link. 44 px tall targets, horizontal scroll on overflow, tokens only.
 - `src/app/page.tsx` renders `<Shell need="dashboard">` → `<Tracker email=… />`.
 - `src/lib/supabase.ts` comment updated (RLS now through `has_role` / `is_owner`).
@@ -160,7 +162,9 @@ Introduce roles in the database and the app shell that reads them. After this ph
 **Contract**:
 - `GET /api/admin/users` → `{ users: { id, email, createdAt, lastSignInAt, invited: boolean, roles: AppRole[] }[] }` from `auth.admin.listUsers({ perPage: 200 })` + `user_roles`. `invited` = never signed in.
 - `POST /api/admin/invite` `{ email, roles: AppRole[] }` (email trimmed, lower-cased, basic format check; `roles` non-empty subset of the enum) → `auth.admin.generateLink({ type: "invite", email })`; on "already registered" → 409 `{ error: "exists" }`. On success insert `user_roles` rows `(newUserId, role, granted_by = admin userId)` with the service client and return `{ link }` where `link = ${origin}/haslo?token_hash=${properties.hashed_token}&type=invite` (`origin` from the request URL, as in `api/yt/connect`).
-- `POST /api/admin/link` `{ userId }` → `generateLink({ type: "magiclink", email: <looked up by id> })` → `{ link }` with `type=magiclink`. Used for "Nowy link" (expired invite, forgotten password).
+- `POST /api/admin/link` `{ userId }` → looks the user up with `auth.admin.getUserById`; if `email_confirmed_at` is null (invite never redeemed) → `generateLink({ type: "invite", email })` and `type=invite` in the link, else `generateLink({ type: "magiclink", email })` and `type=magiclink` → `{ link }`. Used for "Nowy link" (expired invite, forgotten password).
+- If the role insert fails after `generateLink` created the user, return 500 with the message; the user shows up in the list without roles and the admin ticks them there (no compensation logic).
+- Workers: only `fetch`-based supabase-js calls, 3–4 subrequests per request (well under the 50 limit); no Node APIs.
 - Errors are logged by message only (no e-mail in logs), responses carry Polish-mappable codes.
 
 #### 2. Role changes from the client
@@ -173,7 +177,7 @@ Introduce roles in the database and the app shell that reads them. After this ph
 
 #### 3. Admin page
 
-**File**: `src/app/admin/uzytkownicy/page.tsx`, `src/shell/AppNav.tsx` (add "Użytkownicy"), `src/app/globals.css`
+**File**: `src/app/admin/uzytkownicy/page.tsx`, `src/shell/sections.ts` (add "Użytkownicy"), `src/app/globals.css`
 
 **Intent**: Mobile-first panel built from existing classes (`.panel`, `.field`, `.btn`, `.chip`, `.toast`, `.empty`).
 
@@ -185,7 +189,7 @@ Introduce roles in the database and the app shell that reads them. After this ph
 
 **Intent**: The invited person opens the link on her phone, gets signed in, sets a password and lands on her section. Also usable later by anyone signed in to change the password.
 
-**Contract**: on mount, if `token_hash` and `type` are in the query → `auth.verifyOtp({ token_hash, type })` (`invite` | `magiclink`), then drop the query from the URL; errors → "Link wygasł lub został już użyty. Poproś administratora o nowy." Then (signed in) form "Ustaw hasło" (min. 8 chars, twice) → `auth.updateUser({ password })` → `router.replace("/")` (the shell redirects to the permitted section). Not wrapped in a role guard (a user with no role can still set a password). The nav gets a small "Hasło" link next to "Wyloguj".
+**Contract**: on mount, if `token_hash` and `type` are in the query → `auth.verifyOtp({ token_hash, type })` (`invite` | `magiclink`), then drop the query from the URL (`history.replaceState`). Read the query from `window.location.search` inside the effect (no `useSearchParams`, which needs a Suspense boundary to prerender the static page), and guard with a `useRef` so the one-time token is redeemed only once (React dev double effects would otherwise show the "already used" error after a success). `verifyOtp` with `token_hash` returns a session directly and is independent of the PKCE `code` exchange, so `detectSessionInUrl` does not interfere; errors → "Link wygasł lub został już użyty. Poproś administratora o nowy." Then (signed in) form "Ustaw hasło" (min. 8 chars, twice) → `auth.updateUser({ password })` → `router.replace("/")` (the shell redirects to the permitted section). Not wrapped in a role guard (a user with no role can still set a password). The nav gets a small "Hasło" link next to "Wyloguj".
 
 ### Success Criteria:
 
@@ -223,7 +227,8 @@ Tables, RLS and realtime for the shared list, and the `/zapasy` UI modelled on `
 **Contract**:
 - `public.supply_tabs (id uuid pk default gen_random_uuid(), name text not null check (length(trim(name)) > 0), description text null, sort_order int not null default 0, archived boolean not null default false, created_by uuid null default auth.uid() references auth.users on delete set null, created_at timestamptz not null default now(), updated_at timestamptz not null default now())`.
 - `public.supply_items (id uuid pk default gen_random_uuid(), key text not null unique default gen_random_uuid()::text, tab_id uuid not null references public.supply_tabs(id), category text not null default 'Inne', name text not null check (length(trim(name)) > 0), quantity text null, details text null, price_min numeric(10,2) null check (price_min >= 0), price_max numeric(10,2) null, price_label text null, own_price numeric(10,2) null check (own_price >= 0), checked boolean not null default false, checked_by uuid null references auth.users on delete set null, checked_initial text null, checked_at timestamptz null, removed boolean not null default false, sort_order int not null default 0, created_by uuid null default auth.uid() references auth.users on delete set null, created_at, updated_at, check (price_max is null or (price_min is not null and price_max >= price_min)))`; index `(tab_id, category, sort_order)`.
-- Own trigger function `public.supply_touch()` (`search_path ''`, not shared with the dashboard's `touch_updated_at`): sets `updated_at`; on `supply_items`, when `checked` flips to true: `checked_by = auth.uid()`, `checked_at = now()`, `checked_initial = upper(left(auth.jwt() ->> 'email', 1))`; when it flips to false: all three null. BEFORE INSERT OR UPDATE on both tables.
+- Own trigger function `public.supply_touch()` (`search_path ''`, not shared with the dashboard's `touch_updated_at`): sets `updated_at`; on `supply_items`, when `checked` becomes true (`tg_op = 'INSERT' and new.checked`, or `UPDATE` with `not old.checked and new.checked`): `checked_by = auth.uid()`, `checked_at = now()`, `checked_initial = upper(left(auth.jwt() ->> 'email', 1))` (all null when run without a JWT, e.g. the seed); when `new.checked` is false: all three null. BEFORE INSERT OR UPDATE on both tables. `revoke execute … from public, anon, authenticated` (Supabase default privileges grant it to `anon` otherwise).
+- Realtime needs nothing beyond the publication, the `select` grant and the policy: default replica identity (PK) is enough because the client uses only `payload.new` for INSERT/UPDATE and never receives DELETE (no grant). supabase-js passes the session token to the realtime socket and refreshes it, so RLS is evaluated per subscriber via `has_role` (executable by `authenticated`).
 - RLS on both: one policy `supply_rw` FOR ALL `to authenticated using ((select public.has_role('zapasy'))) with check ((select public.has_role('zapasy')))` (admin passes via `has_role`). Grants: `revoke all … from anon, authenticated; grant select, insert, update on … to authenticated` (no row removal from the client — soft only).
 - `alter publication supabase_realtime add table public.supply_tabs, public.supply_items;`
 - Rollback `supabase/rollback/20261029110000_supplies_down.sql`: remove both tables from the publication, drop `supply_items`, `supply_tabs`, `supply_touch()`.
@@ -242,7 +247,7 @@ Tables, RLS and realtime for the shared list, and the `/zapasy` UI modelled on `
 
 #### 3. UI
 
-**File**: `src/features/supplies/SuppliesApp.tsx`, `TabBar.tsx`, `Summary.tsx`, `ItemRow.tsx`, `ItemSheet.tsx`, `TabsSheet.tsx`, `RemovedList.tsx`, `supplies.module.css`; `src/app/zapasy/page.tsx`; `src/shell/AppNav.tsx` (add "Zapasy" for `zapasy`)
+**File**: `src/features/supplies/SuppliesApp.tsx`, `TabBar.tsx`, `Summary.tsx`, `ItemRow.tsx`, `ItemSheet.tsx`, `TabsSheet.tsx`, `RemovedList.tsx`, `supplies.module.css`; `src/app/zapasy/page.tsx`; `src/shell/sections.ts` (add "Zapasy" for `zapasy`)
 
 **Intent**: The prototype's UX on live data, every value editable, big touch targets, works in light and dark via the existing tokens.
 
@@ -265,7 +270,7 @@ Tables, RLS and realtime for the shared list, and the `/zapasy` UI modelled on `
 
 **Intent**: Make "no imports between Zapasy and the dashboard" a lint failure, so removal stays trivial.
 
-**Contract**: `no-restricted-imports` overrides — files `src/features/supplies/**`: forbid `@/components/*`, `@/lib/*` except `@/lib/supabase`, `@/shell/*`, `@/features/admin/*`; files `src/components/**`, `src/lib/**`, `src/shell/**`, `src/features/admin/**`: forbid `@/features/supplies*`. Only `src/app/zapasy/page.tsx` composes Shell + SuppliesApp; `AppNav` links to `/zapasy` by URL only.
+**Contract**: `no-restricted-imports` overrides — files `src/features/supplies/**`: forbid `@/components/*`, `@/lib/*` except `@/lib/supabase`, `@/shell/*`, `@/features/admin/*`; files `src/components/**`, `src/lib/**`, `src/shell/**`, `src/features/admin/**`: forbid `@/features/supplies*`. Only `src/app/zapasy/page.tsx` composes Shell + SuppliesApp; `sections.ts`/`AppNav` link to `/zapasy` by URL only.
 
 ### Success Criteria:
 
@@ -305,7 +310,7 @@ Import `inputs/zapasy-seed.json` once: 2 sub-tabs and 70 items, idempotent, neve
 
 **Contract**:
 - Reads `context/changes/household-supplies/inputs/zapasy-seed.json` (path argument, default that path), writes `supabase/seed/supplies_seed.sql`, escaping quotes.
-- Tabs: `insert into supply_tabs (name, description, sort_order) select … where not exists (select 1 from supply_tabs where name = …)` for "A: niezbędne" (sort 1, description "niezbędne, niedrogie") and "B: droższe" (sort 2, description "droższe, bardzo przydatne") — descriptions from the prototype's tier tags.
+- Tabs: `insert into supply_tabs (name, description, sort_order) select … where not exists (select 1 from supply_tabs where name = …)` for "A: niezbędne" (sort 1, description "niezbędne, niedrogie") and "B: droższe" (sort 2, description "droższe, bardzo przydatne") — descriptions from the prototype's tier tags. Each tab insert also requires `not exists (select 1 from supply_items where key in (<that tier's seed keys>))`, so a re-run after the user renamed a tab does not create an empty duplicate tab.
 - Items: `insert into supply_items (key, tab_id, category, name, quantity, details, price_min, price_max, price_label, own_price, checked, removed, sort_order) select …, (select id from supply_tabs where name = <tier tab> and not archived order by created_at limit 1), … on conflict (key) do nothing` — `tier A → "A: niezbędne"`, `B → "B: droższe"`, `details = null`. "Upsert by key" is implemented as insert-or-skip so user edits are never overwritten (brief: runs once, never overrides later changes).
 - Wrapped in `begin; … commit;`; ends with a verification `select` (tabs, active, removed counts).
 
@@ -392,7 +397,7 @@ Owner override (2026-10-29): no unit tests, no RLS test suite.
 
 | # | File | Kind | Apply when | Safe for live `main`? | Rollback |
 | --- | --- | --- | --- | --- | --- |
-| 1 | `20261029100000_roles.sql` | expand (schema + `is_owner` body + 2 role rows) | after Rafał approves, before merge | yes: the owner gets `admin`+`dashboard` in the same transaction, so `is_owner()` stays true | `supabase/rollback/20261029100000_roles_down.sql` (restores the e-mail `is_owner` body, drops role objects) |
+| 1 | `20261029100000_roles.sql` | expand (schema + `is_owner` body + 2 role rows) | after Rafał approves, before merge | yes: the owner gets `admin`+`dashboard` in the same transaction, so `is_owner()` stays true | `supabase/rollback/20261029100000_roles_down.sql` (restores the e-mail `is_owner` body, drops role objects); only after rolling back #2 (`has_role` dependency) |
 | 2 | `20261029110000_supplies.sql` | expand (new tables, publication) | after approval, before merge | yes: nothing existing changes | `supabase/rollback/20261029110000_supplies_down.sql` |
 | 3 | `supabase/seed/supplies_seed.sql` | data, insert-only, `execute_sql` | after #2, before merge | yes | none needed (fresh tables); to start over, roll back #2 and re-apply |
 

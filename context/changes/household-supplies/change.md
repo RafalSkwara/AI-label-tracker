@@ -1,7 +1,7 @@
 ---
 change_id: household-supplies
 title: User roles, admin panel and the shared "Zapasy" household supplies list
-status: planned
+status: plan_reviewed
 created: 2026-10-29
 updated: 2026-10-29
 archived_at: null
