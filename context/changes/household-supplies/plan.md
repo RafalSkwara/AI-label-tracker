@@ -522,8 +522,9 @@ Made by the planner on 2026-10-29 (owner asked for no questions; non-UI technica
 #### Automated
 
 - [ ] 5.1 E2E passes: `npx playwright test` (with the four env vars set)
-- [ ] 5.2 Type checking, lint, test:int and build pass: `npm run typecheck && npm run lint && npm run test:int && npm run build`
+- [x] 5.2 Type checking, lint, test:int and build pass: `npm run typecheck && npm run lint && npm run test:int && npm run build` — ded8a86
 
 #### Manual
 
 - [ ] 5.3 Rafał runs the full acceptance pass on the phone (Testing Strategy, manual steps) and the existing dashboard tabs work as before
+| D25 | Phase 3–5 implementation notes | Item/tab writes are optimistic with revert + toast; the initial load uses a promise chain in the effect (React 19 lint forbids sync setState in effects). The ESLint boundary uses `patterns` with a negative-lookahead regex for `@/lib/*` except `@/lib/supabase`. The seed generator is `scripts/gen-supplies-seed.mjs` (`npm run seed:supplies:sql`). The E2E test opens the supplies user in a second browser context built from the project's `use` options. Rows 3.1, 4.2 and 5.1 stay open: they need the live DB / owner credentials (not run by the coder) | Mechanical consequences of the plan, no behaviour change |
