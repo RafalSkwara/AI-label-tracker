@@ -474,11 +474,11 @@ Made by the planner on 2026-10-29 (owner asked for no questions; non-UI technica
 
 #### Automated
 
-- [ ] 2.1 Type checking passes: `npm run typecheck`
-- [ ] 2.2 Linting passes: `npm run lint`
-- [ ] 2.3 Integration tests pass: `npm run test:int`
-- [ ] 2.4 OpenNext build passes: `npm run build`
-- [ ] 2.5 `SUPABASE_SECRET_KEY` and `serviceDb` are not referenced from any client file: `grep -rl "serviceDb\|SUPABASE_SECRET_KEY" src --include=*.tsx` is empty
+- [x] 2.1 Type checking passes: `npm run typecheck` — 21ee2bd
+- [x] 2.2 Linting passes: `npm run lint` — 21ee2bd
+- [x] 2.3 Integration tests pass: `npm run test:int` — 21ee2bd
+- [x] 2.4 OpenNext build passes: `npm run build` — 21ee2bd
+- [x] 2.5 `SUPABASE_SECRET_KEY` and `serviceDb` are not referenced from any client file: `grep -rl "serviceDb\|SUPABASE_SECRET_KEY" src --include=*.tsx` is empty — 21ee2bd
 
 #### Manual
 
