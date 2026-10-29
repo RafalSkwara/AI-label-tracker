@@ -50,6 +50,11 @@ begin
         new.checked_by := auth.uid();
         new.checked_at := now();
         new.checked_initial := upper(left(auth.jwt() ->> 'email', 1));
+      else
+        -- still checked: keep who/when, clients cannot rewrite it
+        new.checked_by := old.checked_by;
+        new.checked_at := old.checked_at;
+        new.checked_initial := old.checked_initial;
       end if;
     else
       new.checked_by := null;
