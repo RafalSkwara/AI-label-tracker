@@ -3,18 +3,32 @@ import { secret } from "./env";
 
 const enc = new TextEncoder();
 
-/** Verifies the Supabase access token in `Authorization: Bearer` and that its user is in app_owners (RLS helper is_owner) */
-export async function requireOwner(req: Request): Promise<boolean> {
+/** Client scoped to the caller's own token (RLS and has_role see the caller); null when the token is missing or invalid */
+async function callerDb(req: Request) {
   const token = /^Bearer (.+)$/.exec(req.headers.get("authorization") ?? "")?.[1];
-  if (!token) return false;
+  if (!token) return null;
   const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!, {
     global: { headers: { Authorization: `Bearer ${token}` } },
     auth: { persistSession: false, autoRefreshToken: false },
   });
   const { data: user, error } = await db.auth.getUser(token);
-  if (error || !user.user) return false;
-  const { data } = await db.rpc("is_owner");
+  return error || !user.user ? null : { db, userId: user.user.id };
+}
+
+/** Verifies the Supabase access token in `Authorization: Bearer` and that its user may use the dashboard (RLS helper is_owner = dashboard or admin role) */
+export async function requireOwner(req: Request): Promise<boolean> {
+  const c = await callerDb(req);
+  if (!c) return false;
+  const { data } = await c.db.rpc("is_owner");
   return data === true;
+}
+
+/** Same check for any app role (admin passes every role); returns the caller's user id */
+export async function requireRole(req: Request, role: "admin" | "dashboard" | "zapasy"): Promise<{ userId: string } | null> {
+  const c = await callerDb(req);
+  if (!c) return null;
+  const { data } = await c.db.rpc("has_role", { r: role });
+  return data === true ? { userId: c.userId } : null;
 }
 
 /** Constant-time string compare */
