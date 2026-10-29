@@ -8,7 +8,7 @@ Read this first in a new session. It lets the orchestrator pick up the next phas
   - `plan.md` is canonical (phases, success criteria, Progress table, Review decisions).
   - `plan-brief.md` is the one-page summary; `reviews/plan-review.md` holds the review (all findings accepted and applied).
 - Phases 1–3 are merged (PRs #5–#7). The YouTube sync runs daily at 05:00 UTC; Slowfall and Contents May Vary are connected; impressions/CTR arrive since 2026-10-28. The app runs at https://ai-label-tracker.sidereus.workers.dev (deploys from `main` via Workers Builds) until Phase 4 is migrated; after that its host is https://side-hustle-assistant.sidereus.workers.dev (worker `side-hustle-assistant`) and the old host is a 301 mini worker (`redirect-worker/`, deployed by hand).
-- Phase 4 (rename) is on `claude/sha-phase-4`, reviewed; migration order is in Prerequisites below.
+- Phase 4 (rename) is live at `https://side-hustle-assistant.sidereus.workers.dev` (PR #11); the old host is the `ai-label-tracker` redirect worker. Open: 4.1 smoke E2E (manual).
 - Open manual checks: 2.4, 2.5, 3.7, 3.8 (Rafał, on the phone). 3.6 is done (both channels connected).
 - Phase 7 (traffic sources, search terms, hourly view counter) was added on 2026-10-28 at Rafał's request.
 - Supabase project `gigsqrnwyeioqlkngfqe`. Tasks were updated for the 2026-10-26 strategy (option B) before planning.
@@ -49,3 +49,5 @@ Order: 7 → 4 (rename) → 5 (push) → 6 (DistroKid CSV). Phase 7 goes first b
 2. Merge the Phase 4 PR (new `name` in `wrangler.jsonc`).
 3. Deploy the redirect worker: `npx wrangler deploy -c redirect-worker/wrangler.jsonc` (old host → 301, path and query kept). Until then the old URL is dead.
 4. On the phone: remove the old PWA, install from the new URL, log in again (session and storage are per origin). Existing YouTube connections keep working (tokens are server-side).
+
+**What actually happened (2026-10-29):** renaming a worker that has static assets in the Cloudflare dashboard broke every later deploy (`assets-upload-session` returns 500, code 10013, in Workers Builds and local wrangler). Fix: remove the renamed worker, run `npx opennextjs-cloudflare deploy` to create it fresh (crons come from `wrangler.jsonc`), re-add the 5 runtime secrets (Production, Type Secret), reconnect Workers Builds. Never rename a worker with assets; create a new one instead.

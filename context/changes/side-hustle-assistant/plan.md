@@ -603,8 +603,8 @@ Delegated to the agent per Rafał's working rules (non-UI decisions are the agen
 
 #### Manual
 
-- [ ] 4.5 New URL works, old URL redirects keeping path and query
-- [ ] 4.6 Reinstalled PWA: new name, login and sync work
+- [x] 4.5 New URL works, old URL redirects keeping path and query — 2026-10-29
+- [x] 4.6 Reinstalled PWA: new name, login and sync work — 2026-10-29
 
 ### Phase 5: PWA push notifications
 
