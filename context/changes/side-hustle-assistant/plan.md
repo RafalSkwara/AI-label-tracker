@@ -254,7 +254,7 @@ New name in the app, the PWA and the infrastructure; the old URL redirects. Done
 
 **Intent**: Move to the new host without losing access, sessions or OAuth.
 
-**Contract**: order: (0) add `https://side-hustle-assistant.sidereus.workers.dev/**` to Supabase Auth Redirect URLs, set it as Site URL, and confirm the new Google redirect URI exists; (1) Rafał renames the worker in the Cloudflare dashboard (secrets and cron move with it) and points Workers Builds at the new name; (2) merge the PR with the new `name`; (3) deploy the mini worker: `npx wrangler deploy -c redirect-worker/wrangler.jsonc` — it answers 301 to the new host with path **and query** kept; (4) reinstall the PWA and log in again (session and storage are per origin).
+**Contract**: order: (0) add `https://side-hustle-assistant.sidereus.workers.dev/**` to Supabase Auth Redirect URLs, set it as Site URL, and confirm the new Google redirect URI exists (also point the OAuth consent screen Home page and Privacy policy links at the new host, `/` and `/privacy`); (1) Rafał renames the worker in the Cloudflare dashboard (secrets and cron move with it) and points Workers Builds at the new name; (2) merge the PR with the new `name`; (3) deploy the mini worker: `npx wrangler deploy -c redirect-worker/wrangler.jsonc` — it answers 301 to the new host with path **and query** kept; (4) reinstall the PWA and log in again (session and storage are per origin).
 
 #### 3. Smoke E2E
 
@@ -597,9 +597,9 @@ Delegated to the agent per Rafał's working rules (non-UI decisions are the agen
 #### Automated
 
 - [ ] 4.1 Smoke E2E passes (run manually: needs E2E_EMAIL/E2E_PASSWORD, `npm run preview`)
-- [x] 4.2 Type checking passes
-- [x] 4.3 Linting passes
-- [x] 4.4 OpenNext build passes
+- [x] 4.2 Type checking passes — a538830
+- [x] 4.3 Linting passes — a538830
+- [x] 4.4 OpenNext build passes — a538830
 
 #### Manual
 

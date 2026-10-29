@@ -1,4 +1,4 @@
-# Handoff — Side Hustle Assistant (updated 2026-10-28)
+# Handoff — Side Hustle Assistant (updated 2026-10-29)
 
 Read this first in a new session. It lets the orchestrator pick up the next phase without asking anything.
 
@@ -7,7 +7,8 @@ Read this first in a new session. It lets the orchestrator pick up the next phas
 - Change: `context/changes/side-hustle-assistant/` — status `implementing`.
   - `plan.md` is canonical (phases, success criteria, Progress table, Review decisions).
   - `plan-brief.md` is the one-page summary; `reviews/plan-review.md` holds the review (all findings accepted and applied).
-- Phases 1–3 are merged (PRs #5–#7). The YouTube sync runs daily at 05:00 UTC; Slowfall and Contents May Vary are connected; impressions/CTR arrive since 2026-10-28. The app runs at https://ai-label-tracker.sidereus.workers.dev (deploys from `main` via Workers Builds).
+- Phases 1–3 are merged (PRs #5–#7). The YouTube sync runs daily at 05:00 UTC; Slowfall and Contents May Vary are connected; impressions/CTR arrive since 2026-10-28. The app runs at https://ai-label-tracker.sidereus.workers.dev (deploys from `main` via Workers Builds) until Phase 4 is migrated; after that its host is https://side-hustle-assistant.sidereus.workers.dev (worker `side-hustle-assistant`) and the old host is a 301 mini worker (`redirect-worker/`, deployed by hand).
+- Phase 4 (rename) is on `claude/sha-phase-4`, reviewed; migration order is in Prerequisites below.
 - Open manual checks: 2.4, 2.5, 3.7, 3.8 (Rafał, on the phone). 3.6 is done (both channels connected).
 - Phase 7 (traffic sources, search terms, hourly view counter) was added on 2026-10-28 at Rafał's request.
 - Supabase project `gigsqrnwyeioqlkngfqe`. Tasks were updated for the 2026-10-26 strategy (option B) before planning.
@@ -40,3 +41,11 @@ Order: 7 → 4 (rename) → 5 (push) → 6 (DistroKid CSV). Phase 7 goes first b
 4. Cloudflare Worker secrets: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `SUPABASE_SECRET_KEY`, `STATE_SECRET`, `CRON_SECRET` (VAPID keys later, Phase 5).
 5. Confirm the Workers plan (Free or Paid). Free works: the sync caps at 10 reports per run.
 6. Connect Slowfall right after Phase 3 ships (~10-29): the Reporting API backfills only ~30 days.
+
+## Phase 4 migration order (Rafał, in this order)
+
+0. Supabase Auth: add `https://side-hustle-assistant.sidereus.workers.dev/**` to Redirect URLs and set it as Site URL. Google OAuth client: the new callback URI from item 3 above must exist (already listed there). Consent screen: Home page `https://side-hustle-assistant.sidereus.workers.dev/`, Privacy policy `https://side-hustle-assistant.sidereus.workers.dev/privacy`.
+1. Cloudflare dashboard: rename worker `ai-label-tracker` → `side-hustle-assistant` (secrets and crons move with it); point Workers Builds at the new name. Do not trigger a build of `main` until step 2.
+2. Merge the Phase 4 PR (new `name` in `wrangler.jsonc`).
+3. Deploy the redirect worker: `npx wrangler deploy -c redirect-worker/wrangler.jsonc` (old host → 301, path and query kept). Until then the old URL is dead.
+4. On the phone: remove the old PWA, install from the new URL, log in again (session and storage are per origin). Existing YouTube connections keep working (tokens are server-side).
