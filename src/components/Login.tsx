@@ -25,7 +25,7 @@ export default function Login() {
 
   return (
     <main className="login">
-      <h1>Tracker Wydawnictwa</h1>
+      <h1>Side Hustle Assistant</h1>
       {state === "sent" ? (
         <p className="sub">Link do logowania wysłany na {email}. Otwórz go w tej przeglądarce.</p>
       ) : (

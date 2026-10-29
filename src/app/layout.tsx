@@ -59,9 +59,9 @@ const plexMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Tracker Wydawnictwa",
-  description: "Zadania, pipeline, KPI i koszty kanałów Wydawnictwa",
-  appleWebApp: { capable: true, title: "Tracker", statusBarStyle: "default" },
+  title: "Side Hustle Assistant",
+  description: "Asystent projektów side hustle: alerty, YouTube, zadania, KPI i koszty",
+  appleWebApp: { capable: true, title: "Side Hustle", statusBarStyle: "default" },
 };
 
 export const viewport: Viewport = {

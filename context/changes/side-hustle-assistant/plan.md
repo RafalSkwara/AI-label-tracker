@@ -596,10 +596,10 @@ Delegated to the agent per Rafał's working rules (non-UI decisions are the agen
 
 #### Automated
 
-- [ ] 4.1 Smoke E2E passes
-- [ ] 4.2 Type checking passes
-- [ ] 4.3 Linting passes
-- [ ] 4.4 OpenNext build passes
+- [ ] 4.1 Smoke E2E passes (run manually: needs E2E_EMAIL/E2E_PASSWORD, `npm run preview`)
+- [x] 4.2 Type checking passes
+- [x] 4.3 Linting passes
+- [x] 4.4 OpenNext build passes
 
 #### Manual
 
