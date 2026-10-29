@@ -16,6 +16,22 @@ const eslintConfig = defineConfig([
     ".open-next/**",
     ".wrangler/**",
   ]),
+  // Zapasy isolation: the supplies module and the rest of the app must not import each other.
+  {
+    files: ["src/features/supplies/**"],
+    rules: {
+      "no-restricted-imports": ["error", { patterns: [
+        { group: ["@/components/*", "@/shell/*", "@/features/admin/*"], message: "The supplies module is isolated." },
+        { regex: "^@/lib/(?!supabase$)", message: "The supplies module may import only @/lib/supabase." },
+      ] }],
+    },
+  },
+  {
+    files: ["src/components/**", "src/lib/**", "src/shell/**", "src/features/admin/**"],
+    rules: {
+      "no-restricted-imports": ["error", { patterns: [{ group: ["@/features/supplies*"], message: "Only src/app/zapasy/page.tsx may import the supplies module." }] }],
+    },
+  },
 ]);
 
 export default eslintConfig;
