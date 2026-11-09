@@ -1,8 +1,8 @@
 import { localDateTime, nf, syncErrorPl } from "./format";
-import type { Data, Gate, GateRule } from "./types";
+import type { Data, Gate, GateRule, PipelineRun } from "./types";
 
 export type Alert = {
-  kind: "task_late" | "task_soon" | "renewal" | "ctr_low" | "impressions_drop" | "gate" | "sync_failed";
+  kind: "task_late" | "task_soon" | "renewal" | "ctr_low" | "impressions_drop" | "gate" | "sync_failed" | "automation";
   severity: "high" | "med" | "low";
   title: string;
   detail: string;
@@ -218,5 +218,55 @@ export function alerts(d: Data, today: string, nowMs: number = Date.now()): Aler
     }
   }
 
+  out.push(...automationAlerts(d.runs, nowMs));
+
   return out.sort((a, b) => RANK[a.severity] - RANK[b.severity]);
+}
+
+const HOURS_6 = 6 * 3600e3;
+const BUILD_GAP_MS = 4 * DAY; // builds run Mon + Thu, so the longest normal gap is 4 days
+
+/** Successful builds (newest first, one per slug) with no later successful approve run for the same slug */
+export function awaitingApproval(runs: PipelineRun[]): PipelineRun[] {
+  const approved = new Set(runs.filter((r) => r.workflow === "approve" && r.status === "success" && r.slug).map((r) => r.slug));
+  const seen = new Set<string>();
+  const out: PipelineRun[] = [];
+  for (const r of runs) {
+    if (r.workflow !== "build" || r.status !== "success" || !r.slug || !r.video_id) continue;
+    if (approved.has(r.slug) || seen.has(r.slug)) continue;
+    seen.add(r.slug);
+    out.push(r);
+  }
+  return out;
+}
+
+/** Alerts from the automated pipeline run log (`runs` is newest first) */
+export function automationAlerts(runs: PipelineRun[], nowMs: number): Alert[] {
+  const out: Alert[] = [];
+  const projects = [...new Set(runs.map((r) => r.project_id))];
+  for (const pid of projects) {
+    const own = runs.filter((r) => r.project_id === pid);
+    const base = { kind: "automation" as const, projectId: pid };
+    const build = own.find((r) => r.workflow === "build");
+    if (build) {
+      const at = localDateTime(build.started_at);
+      const ref = `${build.run_id}-${build.run_attempt}`;
+      if (build.status === "failure" || build.status === "cancelled")
+        out.push({ ...base, severity: "high", title: "Build nie powiódł się", detail: `${at}${build.slug ? " · " + build.slug : ""}${build.detail ? " · " + build.detail : ""}`, ref });
+      else if (build.status === "skipped")
+        out.push({ ...base, severity: "high", title: "Build: brak gotowej sceny", detail: `${at} · wyślij kadr przez push.py przed kolejnym buildem (pn/czw 7:00)`, ref });
+      else if (build.status === "running" && nowMs - Date.parse(build.started_at) > HOURS_6)
+        out.push({ ...base, severity: "high", title: "Build wisi", detail: `Start ${at}, brak końca po 6 h`, ref });
+      if (nowMs - Date.parse(build.started_at) > BUILD_GAP_MS)
+        out.push({ ...base, severity: "high", title: "Build nie wystartował", detail: `Ostatni build ${at} (ponad 4 dni temu)`, ref: "gap-" + pid });
+    }
+    for (const r of awaitingApproval(own))
+      out.push({ ...base, severity: "med", title: `Czeka na /publish: ${r.slug}`, detail: `Zbudowany ${localDateTime(r.finished_at ?? r.started_at)} · zatwierdź w issue na GitHubie`, ref: "await-" + r.slug });
+    for (const wf of ["approve", "check"] as const) {
+      const last = own.find((r) => r.workflow === wf);
+      if (last && (last.status === "failure" || last.status === "cancelled"))
+        out.push({ ...base, severity: "high", title: wf === "approve" ? "Publikacja (/publish) nie powiodła się" : "Sprawdzenie połączeń nie powiodło się", detail: `${localDateTime(last.started_at)}${last.slug ? " · " + last.slug : ""}`, ref: `${last.run_id}-${last.run_attempt}` });
+    }
+  }
+  return out;
 }
