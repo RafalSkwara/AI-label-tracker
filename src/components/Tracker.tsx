@@ -2,10 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { archiveRow, loadAll, saveRow, saveSettings, setTaskDone } from "@/lib/data";
-import { daysTo, dfmt, dmy, inDays, nf, num, pln, today } from "@/lib/format";
+import { daysTo, dfmt, dmy, inDays, localDateTime, nf, num, pln, today } from "@/lib/format";
 import { XP_PER_LEVEL, badges, costTotals, levelName, levelOf, monthly, streak, totalHours, totalSubs, trend, weeksAgg, xpTotal } from "@/lib/game";
 import type { Coll, Data, Item, Settings, Sub, Task, Week } from "@/lib/types";
-import { type Alert, alerts } from "@/lib/rules";
+import { type Alert, alerts, awaitingApproval } from "@/lib/rules";
 import RoyaltiesPanel from "./RoyaltiesPanel";
 import Sheet from "./Sheet";
 import Today from "./Today";
@@ -102,6 +102,7 @@ export default function Tracker({ email }: { email: string }) {
     else if (a.kind === "renewal") { const s = find(data.subs); if (s) setEditing({ coll: "subs", rec: s }); else pickTab("subskrypcje"); }
     else if (a.kind === "ctr_low") { const i = find(data.items); if (i) setEditing({ coll: "items", rec: i }); else pickTab("tygodnie"); }
     else if (a.kind === "impressions_drop") pickTab("tygodnie");
+    else if (a.kind === "automation") pickTab("pipeline");
   }
 
   const alertList = useMemo(() => (data ? alerts(data, today()) : []), [data]);
@@ -269,6 +270,7 @@ function PipelinePanel({ data, onAdd, onEdit }: { data: Data; onAdd: () => void;
   return (
     <>
       <Head title="Pipeline" sub="Film live to +50 XP, short +15, EP +40" noun={NOUN.items} onAdd={onAdd} />
+      <Automation data={data} />
       {!data.items.length ? <Empty title="Pipeline jest pusty" body="Dodaj pierwszy film, np. jesienną scenę na weekend." /> : (
         <div className="board">
           {(["pomysł", "produkcja", "zaplanowany", "live"] as const).map((st) => {
@@ -294,6 +296,33 @@ function PipelinePanel({ data, onAdd, onEdit }: { data: Data; onAdd: () => void;
         </div>
       )}
     </>
+  );
+}
+
+const WF = { build: "Build", approve: "Publikacja", check: "Połączenia" } as const;
+const RUN_ST = { running: "w toku", success: "OK", failure: "błąd", cancelled: "przerwany", skipped: "pominięty" } as const;
+const RUN_CLS = { running: "soon", success: "ok", failure: "late", cancelled: "late", skipped: "soon" } as const;
+
+/** Last runs of the automated pipelines (GitHub Actions), newest first */
+function Automation({ data }: { data: Data }) {
+  if (!data.runs.length) return null;
+  const waiting = awaitingApproval(data.runs);
+  return (
+    <section className="runs" aria-label="Automatyzacja">
+      <span className="label">Automatyzacja{waiting.length ? ` · czeka na /publish: ${waiting.length}` : ""}</span>
+      {data.runs.slice(0, 8).map((r) => (
+        <a key={r.run_id + "-" + r.run_attempt} className="card run" href={r.run_url} target="_blank" rel="noopener">
+          <span className="t">{WF[r.workflow]}{r.slug ? " · " + r.slug : ""}</span>
+          <div className="meta">
+            <span className={"chip " + RUN_CLS[r.status]}>{RUN_ST[r.status]}</span>
+            {waiting.some((w) => w.run_id === r.run_id) && <span className="chip soon">czeka na /publish</span>}
+            <span className="chip">{localDateTime(r.started_at)}</span>
+            {r.finished_at && <span className="chip">{Math.max(1, Math.round((Date.parse(r.finished_at) - Date.parse(r.started_at)) / 60e3))} min</span>}
+          </div>
+          {r.detail && <span className="d">{r.detail}</span>}
+        </a>
+      ))}
+    </section>
   );
 }
 

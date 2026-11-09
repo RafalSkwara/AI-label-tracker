@@ -13,6 +13,10 @@ Read this first in a new session. It lets the orchestrator pick up the next phas
 - Phase 7 (traffic sources, search terms, hourly view counter) was added on 2026-10-28 at Rafał's request.
 - Supabase project `gigsqrnwyeioqlkngfqe`. Tasks were updated for the 2026-10-26 strategy (option B) before planning.
 
+## Automation run log (2026-11-09)
+
+- `pipeline_runs` (migration `20261109100000_pipeline_runs.sql`): one row per GitHub Actions run of Slowfall-pipeline (`build`, `approve`, `check`), written by `scripts/runlog.py` in that repo with the service-role key. The app shows the last 8 runs at the top of the Pipeline tab and `automation` alerts on Dziś (failed/skipped/hung build, no build for 4 days, build waiting for `/publish`, failed approve/check). If the table is missing, the app shows nothing and keeps working.
+
 ## Next step
 
 ```

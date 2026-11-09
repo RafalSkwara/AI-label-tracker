@@ -104,6 +104,21 @@ export type SearchTermRow = { project_id: string; yt_video_id: string; period_en
 /** v_views_24h: latest public counter and the snapshot it is compared with */
 export type Views24 = { project_id: string; yt_video_id: string; taken_at: string; view_count: number; base_taken_at: string | null; base_view_count: number | null };
 
+/** pipeline_runs: one GitHub Actions run of an automated pipeline (Slowfall build / approve / check) */
+export type PipelineRun = {
+  run_id: number;
+  run_attempt: number;
+  project_id: string;
+  workflow: "build" | "approve" | "check";
+  status: "running" | "success" | "failure" | "cancelled" | "skipped";
+  slug: string | null;
+  video_id: string | null;
+  detail: string | null;
+  run_url: string;
+  started_at: string;
+  finished_at: string | null;
+};
+
 export type Settings = { budget_min: number; budget_max: number; usd_pln: number; vat_pct: number };
 
 export type XpEvent = { kind: string; ref: string; title: string; at: string; xp: number };
@@ -122,6 +137,7 @@ export type Data = {
   views24: Views24[];
   settings: Settings;
   xp: XpEvent[];
+  runs: PipelineRun[];
 };
 
 export type Coll = "tasks" | "items" | "weeks" | "subs";

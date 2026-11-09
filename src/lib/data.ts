@@ -10,7 +10,7 @@ function check<T>(r: { data: T | null; error: { message: string } | null }): T {
 }
 
 export async function loadAll(db: SupabaseClient = supabase()): Promise<Data> {
-  const [tasks, items, weeks, subs, projects, gates, videos, integrations, traffic, terms, views24, settings, xp] = await Promise.all([
+  const [tasks, items, weeks, subs, projects, gates, videos, integrations, traffic, terms, views24, settings, xp, runs] = await Promise.all([
     db.from("tasks").select("*").is("archived_at", null).order("created_at"),
     db.from("content_items").select("*").is("archived_at", null),
     db.from("weekly_stats").select("*").is("archived_at", null),
@@ -24,6 +24,7 @@ export async function loadAll(db: SupabaseClient = supabase()): Promise<Data> {
     db.from("v_views_24h").select("*"),
     db.from("settings").select("budget_min,budget_max,usd_pln,vat_pct").maybeSingle(),
     db.from("v_xp_events").select("*").order("at", { ascending: false }),
+    db.from("pipeline_runs").select("*").order("started_at", { ascending: false }).limit(40),
   ]);
   return {
     tasks: check(tasks),
@@ -39,6 +40,8 @@ export async function loadAll(db: SupabaseClient = supabase()): Promise<Data> {
     views24: check(views24),
     settings: check(settings) ?? { budget_min: 200, budget_max: 500, usd_pln: 3.7, vat_pct: 23 },
     xp: check(xp),
+    // Optional: an unapplied pipeline_runs migration must not break the whole app
+    runs: runs.error ? [] : (runs.data ?? []),
   };
 }
 
