@@ -30,8 +30,24 @@ export const archiveList = (id: string) =>
 
 export const insertItem = (list_id: string, name: string, quantity: string | null) =>
   must<ShoppingItem>(supabase().from("shopping_items").insert({ list_id, name, quantity }).select(ITEM_COLS).single());
-export const setChecked = (id: string, checked: boolean) =>
-  must<ShoppingItem>(supabase().from("shopping_items").update({ checked }).eq("id", id).select(ITEM_COLS).single());
+export const updateItem = (id: string, patch: { name?: string; quantity?: string | null; checked?: boolean }) =>
+  must<ShoppingItem>(supabase().from("shopping_items").update(patch).eq("id", id).select(ITEM_COLS).single());
+export const uncheckItems = (ids: string[]) =>
+  must<ShoppingItem[]>(supabase().from("shopping_items").update({ checked: false }).in("id", ids).select(ITEM_COLS));
+
+/** Product names the user added before (also removed ones), newest first, for suggestions */
+export async function loadHistory(): Promise<string[]> {
+  const rows = await must<{ name: string }[]>(
+    supabase().from("shopping_items").select("name").order("created_at", { ascending: false }).limit(500),
+  );
+  const seen = new Set<string>(), out: string[] = [];
+  for (const { name } of rows) {
+    const k = name.trim().toLocaleLowerCase("pl");
+    if (!seen.has(k)) { seen.add(k); out.push(name.trim()); }
+  }
+  return out;
+}
+
 /** archived = false restores (undo) */
 export const archiveItems = (ids: string[], archived = true) =>
   must<ShoppingItem[]>(supabase().from("shopping_items").update({ archived_at: archived ? now() : null }).in("id", ids).select(ITEM_COLS));
