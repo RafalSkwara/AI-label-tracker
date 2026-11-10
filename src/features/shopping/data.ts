@@ -3,7 +3,7 @@ import type { ShoppingItem, ShoppingList } from "./types";
 
 // Rows are private to the signed-in user (RLS on owner_id). Removal is soft: archived_at.
 const LIST_COLS = "id,name,created_at,updated_at";
-const ITEM_COLS = "id,list_id,name,quantity,checked,created_at,updated_at";
+const ITEM_COLS = "id,list_id,name,quantity,price,checked,created_at,updated_at";
 const now = () => new Date().toISOString();
 
 async function must<T>(p: PromiseLike<{ data: unknown; error: { message: string } | null }>): Promise<T> {
@@ -30,7 +30,7 @@ export const archiveList = (id: string) =>
 
 export const insertItem = (list_id: string, name: string, quantity: string | null) =>
   must<ShoppingItem>(supabase().from("shopping_items").insert({ list_id, name, quantity }).select(ITEM_COLS).single());
-export const updateItem = (id: string, patch: { name?: string; quantity?: string | null; checked?: boolean }) =>
+export const updateItem = (id: string, patch: { name?: string; quantity?: string | null; price?: number | null; checked?: boolean }) =>
   must<ShoppingItem>(supabase().from("shopping_items").update(patch).eq("id", id).select(ITEM_COLS).single());
 export const uncheckItems = (ids: string[]) =>
   must<ShoppingItem[]>(supabase().from("shopping_items").update({ checked: false }).in("id", ids).select(ITEM_COLS));

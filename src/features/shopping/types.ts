@@ -10,6 +10,8 @@ export type ShoppingItem = {
   list_id: string;
   name: string;
   quantity: string | null;
+  /** total for the line, PLN */
+  price: number | null;
   checked: boolean;
   created_at: string;
   updated_at: string;

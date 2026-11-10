@@ -1,10 +1,11 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { fmtPrice, parsePrice, sumPrices } from "./money";
 import type { ShoppingItem, ShoppingList } from "./types";
 import s from "./shopping.module.css";
 
-type Patch = Partial<Pick<ShoppingItem, "name" | "quantity" | "checked">>;
+type Patch = Partial<Pick<ShoppingItem, "name" | "quantity" | "price" | "checked">>;
 
 type Props = {
   list: ShoppingList;
@@ -25,25 +26,31 @@ type Props = {
 function EditRow({ item, onSave, onClose }: { item: ShoppingItem; onSave: (p: Patch) => void; onClose: () => void }) {
   const [name, setName] = useState(item.name);
   const [qty, setQty] = useState(item.quantity ?? "");
+  const [price, setPrice] = useState(item.price != null ? String(item.price).replace(".", ",") : "");
+  const pr = parsePrice(price);
   function save(e: React.FormEvent) {
     e.preventDefault();
     const n = name.trim(), q = qty.trim() || null;
-    if (!n) return;
+    if (!n || pr === undefined) return;
     const patch: Patch = {};
     if (n !== item.name) patch.name = n;
     if (q !== item.quantity) patch.quantity = q;
+    if (pr !== item.price) patch.price = pr;
     if (Object.keys(patch).length) onSave(patch);
     onClose();
   }
   return (
     <li className={s.editrow}>
-      <form className={s.add} onSubmit={save} onKeyDown={(e) => { if (e.key === "Escape") onClose(); }}>
-        <input aria-label="Nazwa produktu" maxLength={200} value={name} onChange={(e) => setName(e.target.value)} />
-        <input className={s.qtyin} aria-label="Ilość produktu" placeholder="Ilość" autoFocus maxLength={40} value={qty} onChange={(e) => setQty(e.target.value)} />
+      <form className={s.editform} onSubmit={save} onKeyDown={(e) => { if (e.key === "Escape") onClose(); }}>
+        <input className={s.full} aria-label="Nazwa produktu" maxLength={200} value={name} onChange={(e) => setName(e.target.value)} />
+        <input aria-label="Ilość produktu" placeholder="Ilość" autoFocus maxLength={40} value={qty} onChange={(e) => setQty(e.target.value)} />
+        <input aria-label="Cena" placeholder="Cena, zł" inputMode="decimal" aria-invalid={pr === undefined} value={price} onChange={(e) => setPrice(e.target.value)} />
+        <button hidden />
       </form>
+      {pr === undefined && <p className={s.err}>Cena to liczba, np. 4,99.</p>}
       <div className={s.editact}>
         <button type="button" className="btn" onClick={onClose}>Anuluj</button>
-        <button type="button" className="btn primary" disabled={!name.trim()} onClick={save}>Zapisz</button>
+        <button type="button" className="btn primary" disabled={!name.trim() || pr === undefined} onClick={save}>Zapisz</button>
       </div>
     </li>
   );
@@ -57,8 +64,9 @@ function Row({ item, onPatch, onRemove, onEdit }: { item: ShoppingItem; onPatch:
       </label>
       <button className={s.text} onClick={onEdit} aria-label={`Edytuj: ${item.name}`}>
         <span className={s.name}>{item.name}</span>
-        {item.quantity ? <span className={s.qty}>{item.quantity}</span> : !item.checked && <span className={s.qtyadd}>+ ilość</span>}
+        {item.quantity ? <span className={s.qty}>{item.quantity}</span> : !item.checked && <span className={s.qtyadd}>+ ilość, cena</span>}
       </button>
+      {item.price != null && <span className={s.price}>{fmtPrice(item.price)}</span>}
       <button className={s.icon} onClick={() => onRemove(item)} aria-label={`Usuń: ${item.name}`}>×</button>
     </li>
   );
@@ -122,7 +130,13 @@ export default function ListView(p: Props) {
             <h1 className={s.title}>{list.name}</h1>
             <span className={s.pen} aria-hidden="true">✎</span>
           </button>
-          {items.length > 0 && <span className="sub">{todo.length === 0 ? "wszystko kupione" : `do kupienia: ${todo.length}`}</span>}
+          {items.length > 0 && (
+            <span className="sub">
+              {todo.length === 0 ? "wszystko kupione" : `do kupienia: ${todo.length}`}
+              {sumPrices(todo) > 0 && ` · ok. ${fmtPrice(sumPrices(todo))}`}
+              {sumPrices(done) > 0 && ` · w koszyku: ${fmtPrice(sumPrices(done))}`}
+            </span>
+          )}
         </div>
       )}
 
@@ -130,6 +144,7 @@ export default function ListView(p: Props) {
         <div className={s.menu}>
           <button className="btn" onClick={() => { setMenu(false); p.onShare(); }} disabled={todo.length === 0}>Udostępnij listę</button>
           <button className="btn" onClick={() => { setMenu(false); setTitle(list.name); }}>Zmień nazwę</button>
+          <button className="btn" disabled={done.length === 0} onClick={() => { setMenu(false); p.onClearChecked(done); }}>Usuń kupione</button>
           <button className="btn danger" onClick={() => { if (confirm(`Przenieść listę „${list.name}” do archiwum?`)) p.onArchive(); }}>Archiwizuj listę</button>
         </div>
       )}
@@ -149,10 +164,10 @@ export default function ListView(p: Props) {
         <section aria-label="Kupione">
           <div className={s.donehead}>
             <h2>Kupione ({done.length})</h2>
-            <span className={s.doneact}>
-              <button className="linkbtn" onClick={() => p.onUncheckAll(done)}>Odznacz wszystkie</button>
-              <button className="linkbtn" onClick={() => p.onClearChecked(done)}>Usuń kupione</button>
-            </span>
+          </div>
+          <div className={s.doneact}>
+            <button className="btn" onClick={() => p.onUncheckAll(done)}>↺ Odznacz wszystkie</button>
+            <button className="btn danger" onClick={() => p.onClearChecked(done)}>🗑 Usuń kupione ({done.length})</button>
           </div>
           <ul className={s.items}>{done.map(row)}</ul>
         </section>
