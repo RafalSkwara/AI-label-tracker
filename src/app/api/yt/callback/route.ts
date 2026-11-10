@@ -6,7 +6,7 @@ import { syncAll } from "@/lib/server/ytSync";
 
 const CLEAR = "yt_nonce=; Path=/api/yt; Max-Age=0; HttpOnly; Secure; SameSite=Lax";
 const back = (origin: string, yt: string) => {
-  const res = new Response(null, { status: 302, headers: { location: `${origin}/?tab=dzis&yt=${yt}` } });
+  const res = new Response(null, { status: 302, headers: { location: `${origin}/dashboard?tab=dzis&yt=${yt}` } });
   res.headers.append("set-cookie", CLEAR);
   return res;
 };

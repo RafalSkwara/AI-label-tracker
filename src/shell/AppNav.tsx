@@ -12,7 +12,7 @@ export default function AppNav({ can, email }: { can: (role: AppRole) => boolean
   return (
     <nav className="appnav" aria-label="Główne">
       <div className="sections">
-        {SECTIONS.filter((s) => can(s.role)).map((s) => (
+        {SECTIONS.filter((s) => s.role === null || can(s.role)).map((s) => (
           <Link key={s.href} href={s.href} aria-current={path === s.href ? "page" : undefined}>{s.label}</Link>
         ))}
       </div>
