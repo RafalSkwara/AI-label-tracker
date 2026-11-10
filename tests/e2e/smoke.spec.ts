@@ -98,6 +98,12 @@ test("shopping list: create, add, edit, check, remove", async ({ page }) => {
   await page.getByRole("button", { name: "Usuń: Mleko" }).click();
   await expect(page.getByRole("checkbox", { name: "Mleko" })).toHaveCount(0);
 
+  // barcode via manual entry (no camera in headless Chromium): the Worker looks it up in Open Food Facts
+  await page.getByRole("button", { name: "Skanuj kod kreskowy" }).click();
+  await page.getByRole("textbox", { name: "Kod kreskowy" }).fill("5900820000011");
+  await page.getByRole("button", { name: "Szukaj" }).click();
+  await expect(page.getByText(/Kod 5900820000011/)).toBeVisible({ timeout: 10000 });
+
   // clean up: archive the test list
   page.once("dialog", (d) => d.accept());
   await page.getByRole("button", { name: "Opcje listy" }).click();

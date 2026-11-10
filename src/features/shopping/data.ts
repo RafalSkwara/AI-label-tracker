@@ -1,9 +1,10 @@
 import { supabase } from "@/lib/supabase";
+import type { Product } from "@/lib/off";
 import type { ShoppingItem, ShoppingList } from "./types";
 
 // Rows are private to the signed-in user (RLS on owner_id). Removal is soft: archived_at.
 const LIST_COLS = "id,name,created_at,updated_at";
-const ITEM_COLS = "id,list_id,name,quantity,price,checked,created_at,updated_at";
+const ITEM_COLS = "id,list_id,name,quantity,price,barcode,checked,created_at,updated_at";
 const now = () => new Date().toISOString();
 
 async function must<T>(p: PromiseLike<{ data: unknown; error: { message: string } | null }>): Promise<T> {
@@ -28,8 +29,17 @@ export const renameList = (id: string, name: string) =>
 export const archiveList = (id: string) =>
   must<ShoppingList>(supabase().from("shopping_lists").update({ archived_at: now() }).eq("id", id).select(LIST_COLS).single());
 
-export const insertItem = (list_id: string, name: string, quantity: string | null) =>
-  must<ShoppingItem>(supabase().from("shopping_items").insert({ list_id, name, quantity }).select(ITEM_COLS).single());
+export const insertItem = (list_id: string, name: string, quantity: string | null, barcode: string | null) =>
+  must<ShoppingItem>(supabase().from("shopping_items").insert({ list_id, name, quantity, barcode }).select(ITEM_COLS).single());
+
+/** Barcode lookup through the Worker (own history → cache → Open Food Facts family). null: unknown product. */
+export async function lookupBarcode(code: string): Promise<Product | null> {
+  const { data } = await supabase().auth.getSession();
+  const res = await fetch(`/api/products/${code}`, { headers: { authorization: `Bearer ${data.session?.access_token ?? ""}` } });
+  if (res.status === 503) throw new Error("baza produktów chwilowo niedostępna");
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return ((await res.json()) as { product: Product | null }).product;
+}
 export const updateItem = (id: string, patch: { name?: string; quantity?: string | null; price?: number | null; checked?: boolean }) =>
   must<ShoppingItem>(supabase().from("shopping_items").update(patch).eq("id", id).select(ITEM_COLS).single());
 export const uncheckItems = (ids: string[]) =>
