@@ -16,6 +16,7 @@ export default function Privacy() {
           <li>Pobiera statystyki własnego kanału (wyświetlenia, czas oglądania, subskrypcje, wyświetlenia miniatur i CTR) i zapisuje je w bazie właściciela.</li>
           <li>Tokeny dostępu są przechowywane wyłącznie po stronie serwera i nigdy nie trafiają do przeglądarki.</li>
           <li>Dane nie są sprzedawane, udostępniane ani przekazywane osobom trzecim.</li>
+          <li>Skaner kodów kreskowych na liście zakupów wysyła sam kod (bez danych osobowych) do Open Food Facts, Open Beauty Facts lub Open Products Facts. Dane produktów pochodzą z tych baz na licencji <a href="https://opendatacommons.org/licenses/odbl/1-0/">ODbL</a>.</li>
           <li>Dostęp można w każdej chwili cofnąć na stronie <a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a> (Konto Google → Bezpieczeństwo → Aplikacje i usługi innych firm). Po cofnięciu aplikacja nie ma już dostępu do kanału.</li>
         </ul>
       </section>
@@ -28,6 +29,7 @@ export default function Privacy() {
           <li>It reads the channel&apos;s own statistics (views, watch time, subscribers, thumbnail impressions and CTR) and stores them in the owner&apos;s database.</li>
           <li>Access tokens are stored server-side only and are never sent to the browser.</li>
           <li>Data is not sold, shared with or passed to any third party.</li>
+          <li>The shopping-list barcode scanner sends only the barcode (no personal data) to Open Food Facts, Open Beauty Facts or Open Products Facts. Product data comes from these databases under the <a href="https://opendatacommons.org/licenses/odbl/1-0/">ODbL</a>.</li>
           <li>Access can be revoked at any time at <a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a> (Google Account → Security → Third-party apps and services). After revoking, the app can no longer reach the channel.</li>
         </ul>
       </section>

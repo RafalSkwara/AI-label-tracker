@@ -31,6 +31,14 @@ export async function requireRole(req: Request, role: "admin" | "dashboard" | "z
   return data === true ? { userId: c.userId } : null;
 }
 
+/** Any signed-in user holding at least one app role (personal modules); returns the caller's user id */
+export async function requireAnyRole(req: Request): Promise<{ userId: string } | null> {
+  const c = await callerDb(req);
+  if (!c) return null;
+  const { data } = await c.db.from("user_roles").select("role").eq("user_id", c.userId).limit(1);
+  return data && data.length > 0 ? { userId: c.userId } : null;
+}
+
 /** Constant-time string compare */
 export function safeEqual(a: string, b: string): boolean {
   const x = enc.encode(a), y = enc.encode(b);

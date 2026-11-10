@@ -1,7 +1,10 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
+import { displayName, type Product, productUrl, SOURCES } from "@/lib/off";
+import { lookupBarcode } from "./data";
 import { fmtPrice, parsePrice, sumPrices } from "./money";
+import Scanner from "./Scanner";
 import type { ShoppingItem, ShoppingList } from "./types";
 import s from "./shopping.module.css";
 
@@ -15,7 +18,8 @@ type Props = {
   onRename: (name: string) => void;
   onArchive: () => void;
   onShare: () => void;
-  onAdd: (name: string, quantity: string | null) => Promise<void>;
+  onAdd: (name: string, quantity: string | null, barcode: string | null) => Promise<void>;
+  flash: (msg: string) => void;
   onPatch: (item: ShoppingItem, patch: Patch) => void;
   onRemove: (item: ShoppingItem) => void;
   onClearChecked: (done: ShoppingItem[]) => void;
@@ -48,6 +52,11 @@ function EditRow({ item, onSave, onClose }: { item: ShoppingItem; onSave: (p: Pa
         <button hidden />
       </form>
       {pr === undefined && <p className={s.err}>Cena to liczba, np. 4,99.</p>}
+      {item.barcode && (
+        <p className={s.code}>
+          Kod {item.barcode} · <a href={productUrl("off", item.barcode)} target="_blank" rel="noopener noreferrer">Open Food Facts ↗</a>
+        </p>
+      )}
       <div className={s.editact}>
         <button type="button" className="btn" onClick={onClose}>Anuluj</button>
         <button type="button" className="btn primary" disabled={!name.trim() || pr === undefined} onClick={save}>Zapisz</button>
@@ -80,7 +89,33 @@ export default function ListView(p: Props) {
   const [menu, setMenu] = useState(false);
   const [title, setTitle] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
+  const [scan, setScan] = useState(false);
+  const [found, setFound] = useState<{ barcode: string; source: Product["source"] | null } | null>(null);
+  const [looking, setLooking] = useState(false);
   const nameRef = useRef<HTMLInputElement>(null);
+  const addRef = useRef<HTMLButtonElement>(null);
+  const { flash } = p;
+
+  const onCode = useCallback(async (code: string) => {
+    setScan(false);
+    setLooking(true);
+    try {
+      const prod = await lookupBarcode(code);
+      setFound({ barcode: code, source: prod?.source ?? null });
+      if (prod) {
+        setName(displayName(prod));
+        if (prod.quantity) setQty(prod.quantity);
+        setTimeout(() => addRef.current?.focus(), 0);
+      } else {
+        flash("Nie znam tego kodu. Wpisz nazwę, zapamiętam ją.");
+        setTimeout(() => nameRef.current?.focus(), 0);
+      }
+    } catch (e) {
+      setFound({ barcode: code, source: null });
+      flash(`Nie udało się sprawdzić kodu: ${(e as Error).message}`);
+    }
+    setLooking(false);
+  }, [flash]);
 
   const todo = items.filter((i) => !i.checked);
   const done = items.filter((i) => i.checked);
@@ -93,8 +128,8 @@ export default function ListView(p: Props) {
     if (!n || busy) return;
     setBusy(true);
     try {
-      await p.onAdd(n, qty.trim() || null);
-      setName(""); setQty("");
+      await p.onAdd(n, qty.trim() || null, found?.barcode ?? null);
+      setName(""); setQty(""); setFound(null);
     } catch { /* toast already shown; keep the typed text */ }
     setBusy(false);
     nameRef.current?.focus(); // keep the keyboard open for the next item
@@ -152,8 +187,16 @@ export default function ListView(p: Props) {
       <form className={s.add} onSubmit={add}>
         <input ref={nameRef} aria-label="Produkt" placeholder="Produkt" maxLength={200} enterKeyHint="done" autoComplete="off" list="shopping-history" value={name} onChange={(e) => setName(e.target.value)} />
         <input className={s.qtyin} aria-label="Ilość" placeholder="Ilość" maxLength={40} value={qty} onChange={(e) => setQty(e.target.value)} />
-        <button className="btn primary" disabled={!name.trim() || busy}>Dodaj</button>
+        <button type="button" className={s.icon} onClick={() => setScan(true)} disabled={looking} aria-label="Skanuj kod kreskowy">{looking ? "…" : "📷"}</button>
+        <button ref={addRef} className="btn primary" disabled={!name.trim() || busy}>Dodaj</button>
       </form>
+      {found && (
+        <p className={s.code}>
+          Kod {found.barcode}{found.source && found.source !== "own" ? ` · ${SOURCES.find((x) => x.id === found.source)!.label}` : found.source === "own" ? " · z Twojej historii" : " · nieznany"}
+          <button type="button" className="linkbtn" onClick={() => setFound(null)}>usuń kod</button>
+        </p>
+      )}
+      {scan && <Scanner onCode={onCode} onClose={() => setScan(false)} />}
       <datalist id="shopping-history">{suggestions.map((h) => <option key={h} value={h} />)}</datalist>
 
       {items.length === 0 && <div className="empty"><strong>Lista jest pusta</strong>Dodaj pierwszy produkt powyżej. Dotknij produktu, żeby zmienić nazwę lub ilość.</div>}

@@ -102,8 +102,8 @@ export default function ShoppingApp() {
   }
 
   /** Same product already on the list: bring it back / update its quantity instead of adding a duplicate */
-  async function addItem(listId: string, n: string, qty: string | null) {
-    const dup = items.find((i) => i.list_id === listId && norm(i.name) === norm(n));
+  async function addItem(listId: string, n: string, qty: string | null, barcode: string | null) {
+    const dup = items.find((i) => i.list_id === listId && (norm(i.name) === norm(n) || (!!barcode && i.barcode === barcode)));
     try {
       if (dup) {
         const patch = { checked: false, ...(qty && qty !== dup.quantity ? { quantity: qty } : {}) };
@@ -112,7 +112,7 @@ export default function ShoppingApp() {
         flash({ msg: dup.checked ? `„${dup.name}” znów do kupienia` : `Zmieniono ilość: ${dup.name}` });
         return;
       }
-      const i = await insertItem(listId, n, qty);
+      const i = await insertItem(listId, n, qty, barcode);
       setItems((l) => [...l, i]);
       setPastNames((h) => (h.some((x) => norm(x) === norm(n)) ? h : [n, ...h]));
     } catch (err) { fail(err); throw err; }
@@ -175,7 +175,8 @@ export default function ShoppingApp() {
           onBack={() => open(null)}
           onRename={(n) => rename(list.id, n)}
           onArchive={() => removeList(list.id)}
-          onAdd={(n, q) => addItem(list.id, n, q)}
+          onAdd={(n, q, b) => addItem(list.id, n, q, b)}
+          flash={(msg) => flash({ msg })}
           history={pastNames}
           onPatch={patchItem}
           onRemove={(i) => remove([i], `Usunięto: ${i.name}`)}
@@ -206,6 +207,14 @@ export default function ShoppingApp() {
           </div>
         </>
       )}
+
+      <p className={s.attrib}>
+        Dane produktów ze skanera:{" "}
+        <a href="https://world.openfoodfacts.org" target="_blank" rel="noopener noreferrer">Open Food Facts</a>,{" "}
+        <a href="https://world.openbeautyfacts.org" target="_blank" rel="noopener noreferrer">Open Beauty Facts</a>,{" "}
+        <a href="https://world.openproductsfacts.org" target="_blank" rel="noopener noreferrer">Open Products Facts</a>{" "}
+        (licencja <a href="https://opendatacommons.org/licenses/odbl/1-0/" target="_blank" rel="noopener noreferrer">ODbL</a>)
+      </p>
 
       {toast && (
         <div className={`toast ${s.toast}`} role="status">

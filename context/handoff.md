@@ -24,6 +24,8 @@ Rafał wants the app to grow into a personal assistant (later possibly with AI v
 - Shopping lists (`/zakupy`, `src/features/shopping/`): separate module, private per user (RLS `owner_id = auth.uid()`), open to every user with any role. Soft removal via `archived_at`, undo for removed items. Migration `20261110100000_shopping_lists.sql` (rollback in `supabase/rollback/`), applied by Rafał.
 - Sections with `role: null` in `src/shell/sections.ts` are visible to every user with at least one role.
 
+- Barcodes (2026-11-10): scanner in `/zakupy` (native BarcodeDetector, zxing-wasm ponyfill otherwise; `public/zxing_reader.wasm` is a copy from `node_modules/zxing-wasm/dist/reader/`, update it with the package). Lookup `GET /api/products/[code]`: caller's own items → `product_cache` → Open Food Facts → Open Beauty Facts → Open Products Facts (15 reads/min/IP, User-Agent with the channel e-mail, approved by Rafał). Misses are cached 7 days; 429/5xx are not cached. ODbL attribution is shown under the shopping list and on /privacy.
+
 ## Next step
 
 ```
