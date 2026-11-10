@@ -4,13 +4,16 @@ import { expect, type Page, test } from "@playwright/test";
 const email = process.env.E2E_EMAIL;
 const password = process.env.E2E_PASSWORD;
 
-test("password login renders Dziś at 390 px", async ({ page }) => {
+test("password login opens the home page; the Dziś tile renders the dashboard at 390 px", async ({ page }) => {
   test.skip(!email || !password, "set E2E_EMAIL and E2E_PASSWORD");
   await page.goto("/");
   await page.getByLabel("E-mail").fill(email!);
   await page.getByLabel("Hasło").fill(password!);
   await page.getByRole("button", { name: "Zaloguj", exact: true }).click();
 
+  await expect(page.getByRole("heading", { level: 1, name: "Asystent" })).toBeVisible();
+  await page.getByRole("link", { name: /^Dziś/ }).click();
+  await expect(page).toHaveURL(/\/dashboard$/);
   await expect(page.getByRole("heading", { level: 1, name: "Side Hustle Assistant" })).toBeVisible();
   await expect(page.getByRole("heading", { level: 2, name: "Dziś" })).toBeVisible();
   await expect(page.getByLabel("Alerty")).toBeVisible();
@@ -34,20 +37,22 @@ test("roles protect routes; supplies check syncs between two accounts", async ({
   const sup = await supCtx.newPage();
   let name = "";
   try {
-    // zapasy-only account: lands on /zapasy, sees only that section, cannot open the others
+    // zapasy-only account: sees only its sections and tiles, other routes send it to the home page
     await login(sup, supEmail!, supPassword!);
-    await expect(sup).toHaveURL(/\/zapasy$/);
-    await expect(sup.getByRole("link", { name: "Zapasy" })).toBeVisible();
+    await expect(sup.getByRole("heading", { level: 1, name: "Asystent" })).toBeVisible();
+    await expect(sup.getByRole("link", { name: "Zapasy", exact: true })).toBeVisible();
     await expect(sup.getByRole("link", { name: "Dashboard" })).toHaveCount(0);
-    await expect(sup.getByRole("link", { name: "Użytkownicy" })).toHaveCount(0);
-    await sup.goto("/");
-    await expect(sup).toHaveURL(/\/zapasy$/);
+    await expect(sup.getByRole("link", { name: "Użytkownicy", exact: true })).toHaveCount(0);
+    await expect(sup.getByRole("link", { name: /^Pipeline/ })).toHaveCount(0);
+    await sup.goto("/dashboard");
+    await expect(sup).toHaveURL(/\/$/);
     await sup.goto("/admin/uzytkownicy");
-    await expect(sup).toHaveURL(/\/zapasy$/);
+    await expect(sup).toHaveURL(/\/$/);
+    await sup.goto("/zapasy");
 
-    // admin: all three sections, then /zapasy
+    // admin: all sections, then /zapasy
     await login(page, email!, password!);
-    for (const l of ["Dashboard", "Zapasy", "Użytkownicy"]) await expect(page.getByRole("link", { name: l })).toBeVisible();
+    for (const l of ["Dashboard", "Zakupy", "Zapasy", "Użytkownicy"]) await expect(page.getByRole("link", { name: l, exact: true })).toBeVisible();
     await page.goto("/zapasy");
 
     // check an item as the supplies user, expect it checked for the admin within 5 s
@@ -63,4 +68,35 @@ test("roles protect routes; supplies check syncs between two accounts", async ({
     }
     await supCtx.close();
   }
+});
+
+test("shopping list: create, add, check, remove", async ({ page }) => {
+  test.skip(!email || !password, "set E2E_EMAIL and E2E_PASSWORD");
+  await login(page, email!, password!);
+  await page.getByRole("link", { name: /^Zakupy/ }).first().click();
+  await expect(page.getByRole("heading", { level: 1, name: "Listy zakupów" })).toBeVisible();
+
+  const list = `E2E ${Date.now()}`;
+  await page.getByLabel("Nazwa nowej listy").fill(list);
+  await page.getByRole("button", { name: "Utwórz" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: list })).toBeVisible();
+
+  await page.getByLabel("Produkt").fill("Mleko");
+  await page.getByLabel("Ilość").fill("2 l");
+  await page.getByRole("button", { name: "Dodaj" }).click();
+  await page.getByRole("checkbox", { name: "Mleko" }).check();
+  await expect(page.getByRole("region", { name: "Kupione" }).getByRole("checkbox", { name: "Mleko" })).toBeChecked();
+
+  // survives a reload (saved in the database)
+  await page.reload();
+  await expect(page.getByRole("checkbox", { name: "Mleko" })).toBeChecked();
+  await page.getByRole("button", { name: "Usuń: Mleko" }).click();
+  await expect(page.getByRole("checkbox", { name: "Mleko" })).toHaveCount(0);
+
+  // clean up: archive the test list
+  page.once("dialog", (d) => d.accept());
+  await page.getByRole("button", { name: "Opcje listy" }).click();
+  await page.getByRole("button", { name: "Archiwizuj listę" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Listy zakupów" })).toBeVisible();
+  await expect(page.getByRole("button", { name: new RegExp(list) })).toHaveCount(0);
 });

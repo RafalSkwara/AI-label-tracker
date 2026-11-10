@@ -1,8 +1,10 @@
 import type { AppRole } from "./useRoles";
 
-/** Main-nav sections in redirect order. An entry is added only in the phase that ships its route. */
-export const SECTIONS: { href: string; label: string; role: AppRole }[] = [
-  { href: "/", label: "Dashboard", role: "dashboard" },
+/** Main-nav sections. role null: every user with at least one role (personal modules, the home page). */
+export const SECTIONS: { href: string; label: string; role: AppRole | null }[] = [
+  { href: "/", label: "Start", role: null },
+  { href: "/dashboard", label: "Dashboard", role: "dashboard" },
+  { href: "/zakupy", label: "Zakupy", role: null },
   { href: "/zapasy", label: "Zapasy", role: "zapasy" },
   { href: "/admin/uzytkownicy", label: "Użytkownicy", role: "admin" },
 ];

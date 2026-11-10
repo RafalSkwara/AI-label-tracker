@@ -17,6 +17,13 @@ Read this first in a new session. It lets the orchestrator pick up the next phas
 
 - `pipeline_runs` (migration `20261109100000_pipeline_runs.sql`): one row per GitHub Actions run of Slowfall-pipeline (`build`, `approve`, `check`), written by `scripts/runlog.py` in that repo with the service-role key. The app shows the last 8 runs at the top of the Pipeline tab and `automation` alerts on Dziś (failed/skipped/hung build, no build for 4 days, build waiting for `/publish`, failed approve/check). If the table is missing, the app shows nothing and keeps working.
 
+## Personal assistant direction (2026-11-10)
+
+Rafał wants the app to grow into a personal assistant (later possibly with AI via his Claude subscription; not built yet).
+- Step 1 (branch `claude/project-thread-e1wzmh`): `/` is now a home page with tiles per feature (`src/features/home/tiles.ts`); the dashboard moved to `/dashboard` (tiles deep-link with `?tab=`); YouTube OAuth callback returns to `/dashboard`. A user without the role for a route is sent to `/`.
+- Shopping lists (`/zakupy`, `src/features/shopping/`): separate module, private per user (RLS `owner_id = auth.uid()`), open to every user with any role. Soft removal via `archived_at`, undo for removed items. Migration `20261110100000_shopping_lists.sql` (rollback in `supabase/rollback/`), applied by Rafał.
+- Sections with `role: null` in `src/shell/sections.ts` are visible to every user with at least one role.
+
 ## Next step
 
 ```

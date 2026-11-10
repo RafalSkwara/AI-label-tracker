@@ -1,8 +1,8 @@
 "use client";
 
-import Tracker from "@/components/Tracker";
+import Home from "@/features/home/Home";
 import Shell from "@/shell/Shell";
 
 export default function Page() {
-  return <Shell need="dashboard">{({ email }) => <Tracker email={email} />}</Shell>;
+  return <Shell need={null}>{({ can }) => <Home can={can} />}</Shell>;
 }
