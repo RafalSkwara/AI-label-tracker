@@ -118,7 +118,7 @@ export default function ShoppingApp() {
     } catch (err) { fail(err); throw err; }
   }
 
-  async function patchItem(item: ShoppingItem, patch: Partial<Pick<ShoppingItem, "name" | "quantity" | "checked">>) {
+  async function patchItem(item: ShoppingItem, patch: Partial<Pick<ShoppingItem, "name" | "quantity" | "price" | "checked">>) {
     setItems((l) => l.map((x) => (x.id === item.id ? { ...x, ...patch } : x)));
     try { replaceItems([await updateItem(item.id, patch)]); }
     catch (err) { setItems((l) => l.map((x) => (x.id === item.id ? item : x))); fail(err); }
