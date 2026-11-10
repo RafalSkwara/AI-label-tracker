@@ -70,7 +70,7 @@ test("roles protect routes; supplies check syncs between two accounts", async ({
   }
 });
 
-test("shopping list: create, add, check, remove", async ({ page }) => {
+test("shopping list: create, add, edit, check, remove", async ({ page }) => {
   test.skip(!email || !password, "set E2E_EMAIL and E2E_PASSWORD");
   await login(page, email!, password!);
   await page.getByRole("link", { name: /^Zakupy/ }).first().click();
@@ -81,9 +81,14 @@ test("shopping list: create, add, check, remove", async ({ page }) => {
   await page.getByRole("button", { name: "Utwórz" }).click();
   await expect(page.getByRole("heading", { level: 1, name: list })).toBeVisible();
 
-  await page.getByLabel("Produkt").fill("Mleko");
-  await page.getByLabel("Ilość").fill("2 l");
+  await page.getByLabel("Produkt", { exact: true }).fill("Mleko");
+  await page.getByLabel("Ilość", { exact: true }).fill("2 l");
   await page.getByRole("button", { name: "Dodaj" }).click();
+  // edit the quantity in place
+  await page.getByRole("button", { name: "Edytuj: Mleko" }).click();
+  await page.getByLabel("Ilość produktu").fill("1 l");
+  await page.getByRole("button", { name: "Zapisz" }).click();
+  await expect(page.getByRole("button", { name: "Edytuj: Mleko" })).toContainText("1 l");
   await page.getByRole("checkbox", { name: "Mleko" }).check();
   await expect(page.getByRole("region", { name: "Kupione" }).getByRole("checkbox", { name: "Mleko" })).toBeChecked();
 

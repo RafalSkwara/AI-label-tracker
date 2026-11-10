@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { archiveItems, archiveList, insertItem, insertList, loadShopping, renameList, setChecked } from "./data";
+import { archiveItems, archiveList, insertItem, insertList, loadHistory, loadShopping, renameList, uncheckItems, updateItem } from "./data";
 import ListView from "./ListView";
 import type { ShoppingItem, ShoppingList } from "./types";
 import s from "./shopping.module.css";
@@ -9,6 +9,8 @@ import s from "./shopping.module.css";
 export type Toast = { msg: string; undo?: () => void };
 
 const PARAM = "lista";
+const norm = (s: string) => s.trim().toLocaleLowerCase("pl");
+const byCreated = (a: ShoppingItem, b: ShoppingItem) => a.created_at.localeCompare(b.created_at);
 const fromUrl = () => new URLSearchParams(window.location.search).get(PARAM);
 
 /** Shopping lists: overview of the user's lists, or one list when ?lista=<id> is in the URL (the phone's back button returns to the overview) */
@@ -21,6 +23,7 @@ export default function ShoppingApp() {
   const [sel, setSel] = useState<string | null>(fromUrl);
   const [name, setName] = useState("");
   const [toast, setToast] = useState<Toast | null>(null);
+  const [pastNames, setPastNames] = useState<string[]>([]);
   const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const flash = useCallback((t: Toast) => {
@@ -45,6 +48,7 @@ export default function ShoppingApp() {
     // initial load: setState happens after the awaited fetch, not synchronously
     // eslint-disable-next-line react-hooks/set-state-in-effect
     reload();
+    loadHistory().then(setPastNames, () => {}); // suggestions are optional
     const onPop = () => setSel(fromUrl());
     // another device may have changed the lists while the app was in the background
     const onVis = () => { if (document.visibilityState === "visible") reload(); };
@@ -97,16 +101,46 @@ export default function ShoppingApp() {
     } catch (err) { fail(err); }
   }
 
+  /** Same product already on the list: bring it back / update its quantity instead of adding a duplicate */
   async function addItem(listId: string, n: string, qty: string | null) {
-    try { const i = await insertItem(listId, n, qty); setItems((l) => [...l, i]); }
-    catch (err) { fail(err); throw err; }
+    const dup = items.find((i) => i.list_id === listId && norm(i.name) === norm(n));
+    try {
+      if (dup) {
+        const patch = { checked: false, ...(qty && qty !== dup.quantity ? { quantity: qty } : {}) };
+        if (!dup.checked && !patch.quantity) { flash({ msg: `„${dup.name}” już jest na liście` }); return; }
+        replaceItems([await updateItem(dup.id, patch)]);
+        flash({ msg: dup.checked ? `„${dup.name}” znów do kupienia` : `Zmieniono ilość: ${dup.name}` });
+        return;
+      }
+      const i = await insertItem(listId, n, qty);
+      setItems((l) => [...l, i]);
+      setPastNames((h) => (h.some((x) => norm(x) === norm(n)) ? h : [n, ...h]));
+    } catch (err) { fail(err); throw err; }
   }
 
-  async function toggle(item: ShoppingItem) {
-    const checked = !item.checked;
-    setItems((l) => l.map((x) => (x.id === item.id ? { ...x, checked } : x)));
-    try { replaceItems([await setChecked(item.id, checked)]); }
-    catch (err) { setItems((l) => l.map((x) => (x.id === item.id ? { ...x, checked: !checked } : x))); fail(err); }
+  async function patchItem(item: ShoppingItem, patch: Partial<Pick<ShoppingItem, "name" | "quantity" | "checked">>) {
+    setItems((l) => l.map((x) => (x.id === item.id ? { ...x, ...patch } : x)));
+    try { replaceItems([await updateItem(item.id, patch)]); }
+    catch (err) { setItems((l) => l.map((x) => (x.id === item.id ? item : x))); fail(err); }
+  }
+
+  async function uncheckAll(done: ShoppingItem[]) {
+    const ids = done.map((i) => i.id);
+    setItems((l) => l.map((x) => (ids.includes(x.id) ? { ...x, checked: false } : x)));
+    try { replaceItems(await uncheckItems(ids)); flash({ msg: `Znów do kupienia: ${ids.length}` }); }
+    catch (err) { setItems((l) => l.map((x) => done.find((d) => d.id === x.id) ?? x)); fail(err); }
+  }
+
+  async function share(list: ShoppingList) {
+    const todo = items.filter((i) => i.list_id === list.id && !i.checked);
+    const text = [list.name, ...todo.map((i) => `- ${i.name}${i.quantity ? ` (${i.quantity})` : ""}`)].join("\n");
+    try {
+      if (navigator.share) { await navigator.share({ title: list.name, text }); return; }
+      await navigator.clipboard.writeText(text);
+      flash({ msg: "Skopiowano listę" });
+    } catch (err) {
+      if ((err as Error).name !== "AbortError") flash({ msg: "Nie udało się udostępnić listy" });
+    }
   }
 
   async function remove(gone: ShoppingItem[], msg: string) {
@@ -119,11 +153,11 @@ export default function ShoppingApp() {
         msg,
         undo: async () => {
           setToast(null);
-          try { const back = await archiveItems(ids, false); setItems((l) => [...l, ...back].sort((a, b) => a.created_at.localeCompare(b.created_at))); }
+          try { const back = await archiveItems(ids, false); setItems((l) => [...l, ...back].sort(byCreated)); }
           catch (err) { fail(err); }
         },
       });
-    } catch (err) { setItems((l) => [...l, ...gone].sort((a, b) => a.created_at.localeCompare(b.created_at))); fail(err); }
+    } catch (err) { setItems((l) => [...l, ...gone].sort(byCreated)); fail(err); }
   }
 
   if (!loaded) return <div className="wrap"><p className="sub">Wczytywanie…</p></div>;
@@ -142,9 +176,12 @@ export default function ShoppingApp() {
           onRename={(n) => rename(list.id, n)}
           onArchive={() => removeList(list.id)}
           onAdd={(n, q) => addItem(list.id, n, q)}
-          onToggle={toggle}
+          history={pastNames}
+          onPatch={patchItem}
           onRemove={(i) => remove([i], `Usunięto: ${i.name}`)}
           onClearChecked={(done) => remove(done, `Usunięto kupione (${done.length})`)}
+          onUncheckAll={uncheckAll}
+          onShare={() => share(list)}
         />
       ) : (
         <>
