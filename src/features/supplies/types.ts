@@ -1,5 +1,8 @@
 export type SupplyTab = {
   id: string;
+  owner_id: string;
+  /** set by the database on insert */
+  owner_email: string | null;
   name: string;
   description: string | null;
   sort_order: number;
@@ -26,5 +29,5 @@ export type SupplyItem = {
 };
 
 export type ItemFields = Partial<Omit<SupplyItem, "id" | "updated_at" | "checked_initial">>;
-export type TabFields = Partial<Omit<SupplyTab, "id" | "updated_at">>;
+export type TabFields = Partial<Omit<SupplyTab, "id" | "updated_at" | "owner_id" | "owner_email">>;
 export type Status = "connecting" | "live" | "offline";

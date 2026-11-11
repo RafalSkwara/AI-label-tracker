@@ -72,6 +72,7 @@ export async function setTaskDone(id: string, done: boolean) {
   check(await supabase().from("tasks").update({ done }).eq("id", id));
 }
 
+/** One settings row per user (owner_id defaults to the caller); the first save creates it */
 export async function saveSettings(patch: Row) {
-  check(await supabase().from("settings").update(patch).eq("id", true));
+  check(await supabase().from("settings").upsert(patch, { onConflict: "owner_id" }));
 }

@@ -2,8 +2,8 @@ import { supabase } from "@/lib/supabase";
 import type { Product } from "@/lib/off";
 import type { ShoppingItem, ShoppingList } from "./types";
 
-// Rows are private to the signed-in user (RLS on owner_id). Removal is soft: archived_at.
-const LIST_COLS = "id,name,created_at,updated_at";
+// Lists belong to their owner and are visible to the people they are shared with (RLS). Removal is soft: archived_at.
+const LIST_COLS = "id,owner_id,owner_email,name,created_at,updated_at";
 const ITEM_COLS = "id,list_id,name,quantity,price,barcode,checked,created_at,updated_at";
 const now = () => new Date().toISOString();
 

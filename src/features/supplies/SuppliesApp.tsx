@@ -2,6 +2,8 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { insertItem, insertTab, loadSupplies, subscribe, updateItem, updateTab } from "./data";
+import { addShare, loadShares, removeShare, type Shares, sharedLabel, SUPPLIES } from "@/features/sharing/data";
+import ShareSheet from "@/features/sharing/ShareSheet";
 import ItemRow from "./ItemRow";
 import ItemSheet from "./ItemSheet";
 import { fmtRange, fold, sum } from "./money";
@@ -28,7 +30,8 @@ function groupByCategory(items: SupplyItem[]): [string, SupplyItem[]][] {
   return [...map.entries()];
 }
 
-export default function SuppliesApp() {
+/** Household supplies: the user's own tabs plus tabs other people shared with them by e-mail */
+export default function SuppliesApp({ userId, email }: { userId: string; email: string }) {
   const [tabs, setTabs] = useState<SupplyTab[]>([]);
   const [items, setItems] = useState<SupplyItem[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -43,6 +46,8 @@ export default function SuppliesApp() {
   const [cat, setCat] = useState("");
   const [sheet, setSheet] = useState<SupplyItem | "new" | null>(null);
   const [tabsOpen, setTabsOpen] = useState(false);
+  const [shares, setShares] = useState<Shares>({});
+  const [sharing, setSharing] = useState<string | null>(null);
   const hiddenAt = useRef(0);
   const seenLive = useRef(false);
 
@@ -54,8 +59,8 @@ export default function SuppliesApp() {
 
   const reload = useCallback(async () => {
     try {
-      const d = await loadSupplies();
-      setTabs(d.tabs); setItems(d.items); setError("");
+      const [d, sh] = await Promise.all([loadSupplies(), loadShares(SUPPLIES)]);
+      setTabs(d.tabs); setItems(d.items); setShares(sh); setError("");
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -72,8 +77,8 @@ export default function SuppliesApp() {
         if (st === "live") { if (seenLive.current) reload(); seenLive.current = true; }
       },
     );
-    loadSupplies().then(
-      (d) => { setTabs(d.tabs); setItems(d.items); setError(""); setLoaded(true); },
+    Promise.all([loadSupplies(), loadShares(SUPPLIES)]).then(
+      ([d, sh]) => { setTabs(d.tabs); setItems(d.items); setShares(sh); setError(""); setLoaded(true); },
       (e) => { setError((e as Error).message); setLoaded(true); },
     );
     const onVis = () => {
@@ -154,7 +159,8 @@ export default function SuppliesApp() {
   }
 
   function moveTab(tab: SupplyTab, dir: -1 | 1) {
-    const other = activeTabs[activeTabs.findIndex((t) => t.id === tab.id) + dir];
+    const own = activeTabs.filter((t) => t.owner_id === userId); // only the owner may reorder
+    const other = own[own.findIndex((t) => t.id === tab.id) + dir];
     if (!other) return;
     patchTab(tab.id, { sort_order: other.sort_order });
     patchTab(other.id, { sort_order: tab.sort_order });
@@ -165,6 +171,30 @@ export default function SuppliesApp() {
       const row = await insertTab({ name, sort_order: Math.max(0, ...tabs.map((t) => t.sort_order)) + 1 });
       setTabs((l) => merge(l, row));
     } catch (e) { flash(`Nie zapisano: ${(e as Error).message}`); }
+  }
+
+  /** Recipient: whose tab; owner: how many people see it */
+  const shareInfo = (t: SupplyTab) => t.owner_id !== userId
+    ? `od ${t.owner_email ?? "innej osoby"}`
+    : (shares[t.id]?.length ? sharedLabel(shares[t.id].length) : "");
+  const sharingTab = sharing ? tabs.find((t) => t.id === sharing) : undefined;
+  const curTab = cur === "all" ? undefined : activeTabs.find((t) => t.id === cur);
+
+  async function shareAdd(tab: SupplyTab, mail: string) {
+    await addShare(SUPPLIES, tab.id, mail);
+    setShares((sh) => ({ ...sh, [tab.id]: [...(sh[tab.id] ?? []), mail] }));
+    flash(`Udostępniono: ${mail}`);
+  }
+  async function shareRemove(tab: SupplyTab, mail: string) {
+    await removeShare(SUPPLIES, tab.id, mail);
+    setShares((sh) => ({ ...sh, [tab.id]: (sh[tab.id] ?? []).filter((m) => m !== mail) }));
+  }
+  async function leave(tab: SupplyTab) {
+    await removeShare(SUPPLIES, tab.id, email);
+    setSharing(null);
+    setTabs((l) => l.filter((t) => t.id !== tab.id));
+    setItems((l) => l.filter((i) => i.tab_id !== tab.id));
+    flash(`Opuszczono „${tab.name}”`);
   }
 
   const catsOf = (tabId: string) => [...new Set(items.filter((i) => i.tab_id === tabId).map((i) => i.category))];
@@ -189,6 +219,7 @@ export default function SuppliesApp() {
       <div className={s.top}>
         <Summary items={active} status={status} />
         <TabBar tabs={activeTabs} sel={cur} onSel={pick} onManage={() => setTabsOpen(true)} />
+        {curTab && <button className={s.sharedbtn} onClick={() => setSharing(curTab.id)}>👥 {shareInfo(curTab) || "Tylko Ty · udostępnij"}</button>}
         <div className={s.filters}>
           <label><input type="checkbox" checked={hide} onChange={(e) => setHide(e.target.checked)} />Ukryj kupione</label>
           <input type="search" aria-label="Szukaj" placeholder="Szukaj…" value={q} onChange={(e) => setQ(e.target.value)} />
@@ -214,6 +245,7 @@ export default function SuppliesApp() {
                     <h2>{t.name}</h2>
                     {hi > 0 && <span className="sub">razem ok. {fmtRange(lo, hi)}</span>}
                   </div>
+                  {shareInfo(t) && <button className={s.sharedbtn} onClick={() => setSharing(t.id)}>👥 {shareInfo(t)}</button>}
                   {t.description && <p className="sub">{t.description}</p>}
                   {renderGroups(mine)}
                 </section>
@@ -237,7 +269,20 @@ export default function SuppliesApp() {
           onClose={() => setSheet(null)}
         />
       )}
-      {tabsOpen && <TabsSheet tabs={tabs.slice().sort((a, b) => a.sort_order - b.sort_order)} items={items} onUpdate={patchTab} onMove={moveTab} onAdd={addTab} onClose={() => setTabsOpen(false)} />}
+      {tabsOpen && <TabsSheet tabs={tabs.slice().sort((a, b) => a.sort_order - b.sort_order)} items={items} userId={userId} shareInfo={shareInfo}
+        onShare={(t) => { setTabsOpen(false); setSharing(t.id); }} onUpdate={patchTab} onMove={moveTab} onAdd={addTab} onClose={() => setTabsOpen(false)} />}
+      {sharingTab && (
+        <ShareSheet
+          what={`podzakładkę „${sharingTab.name}”`}
+          emails={(shares[sharingTab.id] ?? []).filter((m) => m !== email)}
+          owner={sharingTab.owner_id === userId}
+          ownerEmail={sharingTab.owner_email}
+          onAdd={(m) => shareAdd(sharingTab, m)}
+          onRemove={(m) => shareRemove(sharingTab, m)}
+          onLeave={() => leave(sharingTab)}
+          onClose={() => setSharing(null)}
+        />
+      )}
       {toast && <div className="toast" role="status">{toast}</div>}
     </main>
   );

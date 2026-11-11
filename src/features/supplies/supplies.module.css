@@ -45,3 +45,4 @@
 .tabrow{display:grid;gap:6px;border:1px solid var(--line);border-radius:8px;padding:10px}
 .tabrow .ctl{display:flex;gap:6px;flex-wrap:wrap}
 .err{color:var(--bad);font-size:.85rem;margin:0}
+.sharedbtn{justify-self:start;background:none;border:0;padding:0;min-height:32px;color:var(--accent);cursor:pointer;font:inherit;font-size:.82rem;text-align:left;overflow-wrap:anywhere}

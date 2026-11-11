@@ -1,5 +1,8 @@
 export type ShoppingList = {
   id: string;
+  owner_id: string;
+  /** set by the database on insert */
+  owner_email: string | null;
   name: string;
   created_at: string;
   updated_at: string;

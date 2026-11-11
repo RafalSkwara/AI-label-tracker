@@ -32,6 +32,15 @@ Rafał wants the app to grow into a personal assistant (later possibly with AI v
 - Dark-only "Kokpit" theme: tokens in `src/app/globals.css`. Bottom tab bar (`src/shell/AppNav.tsx`, `sections.ts`): Start, Kanały, Zakupy, Zapasy (by role) + "Więcej" sheet (admin, password, privacy, sign out).
 - Dashboard "Przegląd" tab (`src/components/Overview.tsx`) per YT channel: alerts, rule-based conclusions (`src/lib/channel.ts` `insights`), 6 metric panels with sparklines (last 8 weeks), 24 h, cost, traffic sources (Shorts is its own group now), search terms, top videos (42 days), gates, publish plan + automation runs, YPP progress.
 
+## Per-user data and sharing (2026-11-11)
+
+- Migration `20261111120000_per_user_data.sql` (rollback in `supabase/rollback/`): every account sees only its own data. Roles stay as module switches (admin, dashboard, zapasy) and no longer grant access to other people's rows.
+  - Kanały: `projects.owner_id`; `tasks`, `subscriptions`, `content_items` have their own `owner_id` (project optional); project-bound tables check `owns_project(project_id)`; `settings` is one row per user (key `owner_id`, saved with upsert). `integration_status()` and `/api/yt/connect|sync` are limited to the caller's projects. The daily cron still syncs every integration (service role).
+  - Zakupy: lists keep `owner_id`; `shopping_list_shares (list_id, email)` grants read/edit of the list and its items. Only the owner renames, archives and shares; a recipient can leave (removes their own share row). `owner_email` is stamped on insert so recipients see whose list it is.
+  - Zapasy: same model with `supply_tab_shares (tab_id, email)`; the "zapasy" role is still needed to open the module. The migration kept existing tabs shared with every current "zapasy" user.
+  - Shares match on the e-mail in the JWT, so sharing with an address that has no account yet works once the admin creates it.
+- UI: Start shows one square tile per feature (2 columns on a phone). Koszty and Subskrypcje are one tab (`?tab=subskrypcje` redirects to Koszty). Sharing sheet: `src/features/sharing/`.
+
 ## Next step
 
 ```

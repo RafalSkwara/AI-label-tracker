@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { archiveItems, archiveList, insertItem, insertList, loadHistory, loadShopping, renameList, uncheckItems, updateItem } from "./data";
+import { addShare, loadShares, removeShare, SHOPPING, type Shares, sharedLabel } from "@/features/sharing/data";
+import ShareSheet from "@/features/sharing/ShareSheet";
 import ListView from "./ListView";
 import type { ShoppingItem, ShoppingList } from "./types";
 import s from "./shopping.module.css";
@@ -13,8 +15,8 @@ const norm = (s: string) => s.trim().toLocaleLowerCase("pl");
 const byCreated = (a: ShoppingItem, b: ShoppingItem) => a.created_at.localeCompare(b.created_at);
 const fromUrl = () => new URLSearchParams(window.location.search).get(PARAM);
 
-/** Shopping lists: overview of the user's lists, or one list when ?lista=<id> is in the URL (the phone's back button returns to the overview) */
-export default function ShoppingApp() {
+/** Shopping lists: overview of the user's own and shared lists, or one list when ?lista=<id> is in the URL (the phone's back button returns to the overview) */
+export default function ShoppingApp({ userId, email }: { userId: string; email: string }) {
   const [lists, setLists] = useState<ShoppingList[]>([]);
   const [items, setItems] = useState<ShoppingItem[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -24,6 +26,8 @@ export default function ShoppingApp() {
   const [name, setName] = useState("");
   const [toast, setToast] = useState<Toast | null>(null);
   const [pastNames, setPastNames] = useState<string[]>([]);
+  const [shares, setShares] = useState<Shares>({});
+  const [sharing, setSharing] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const flash = useCallback((t: Toast) => {
@@ -35,8 +39,8 @@ export default function ShoppingApp() {
 
   const reload = useCallback(async () => {
     try {
-      const d = await loadShopping();
-      setLists(d.lists); setItems(d.items); setError("");
+      const [d, sh] = await Promise.all([loadShopping(), loadShares(SHOPPING)]);
+      setLists(d.lists); setItems(d.items); setShares(sh); setError("");
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -131,7 +135,29 @@ export default function ShoppingApp() {
     catch (err) { setItems((l) => l.map((x) => done.find((d) => d.id === x.id) ?? x)); fail(err); }
   }
 
-  async function share(list: ShoppingList) {
+  async function shareAdd(list: ShoppingList, mail: string) {
+    await addShare(SHOPPING, list.id, mail);
+    setShares((sh) => ({ ...sh, [list.id]: [...(sh[list.id] ?? []), mail] }));
+    flash({ msg: `Udostępniono: ${mail}` });
+  }
+  async function shareRemove(list: ShoppingList, mail: string) {
+    await removeShare(SHOPPING, list.id, mail);
+    setShares((sh) => ({ ...sh, [list.id]: (sh[list.id] ?? []).filter((m) => m !== mail) }));
+  }
+  async function leave(list: ShoppingList) {
+    await removeShare(SHOPPING, list.id, email);
+    setSharing(null);
+    setLists((ls) => ls.filter((l) => l.id !== list.id));
+    open(null);
+    flash({ msg: `Opuszczono listę „${list.name}”` });
+  }
+
+  /** Recipient: whose list; owner: how many people see it */
+  const shareInfo = (l: ShoppingList) => l.owner_id !== userId
+    ? `od ${l.owner_email ?? "innej osoby"}`
+    : (shares[l.id]?.length ? sharedLabel(shares[l.id].length) : "");
+
+  async function sendText(list: ShoppingList) {
     const todo = items.filter((i) => i.list_id === list.id && !i.checked);
     const text = [list.name, ...todo.map((i) => `- ${i.name}${i.quantity ? ` (${i.quantity})` : ""}`)].join("\n");
     try {
@@ -182,7 +208,10 @@ export default function ShoppingApp() {
           onRemove={(i) => remove([i], `Usunięto: ${i.name}`)}
           onClearChecked={(done) => remove(done, `Usunięto kupione (${done.length})`)}
           onUncheckAll={uncheckAll}
-          onShare={() => share(list)}
+          onSendText={() => sendText(list)}
+          owner={list.owner_id === userId}
+          shareInfo={shareInfo(list)}
+          onSharing={() => setSharing(list.id)}
         />
       ) : (
         <>
@@ -197,10 +226,12 @@ export default function ShoppingApp() {
             {lists.map((l) => {
               const mine = items.filter((i) => i.list_id === l.id);
               const left = mine.filter((i) => !i.checked).length;
+              const info = shareInfo(l);
               return (
                 <button key={l.id} className={s.listcard} onClick={() => open(l.id)}>
                   <span className={s.lname}>{l.name}</span>
                   <span className="sub">{mine.length === 0 ? "pusta" : left === 0 ? `wszystko kupione (${mine.length})` : `do kupienia: ${left} z ${mine.length}`}</span>
+                  {info && <span className={s.shared}>👥 {info}</span>}
                 </button>
               );
             })}
@@ -215,6 +246,19 @@ export default function ShoppingApp() {
         <a href="https://world.openproductsfacts.org" target="_blank" rel="noopener noreferrer">Open Products Facts</a>{" "}
         (licencja <a href="https://opendatacommons.org/licenses/odbl/1-0/" target="_blank" rel="noopener noreferrer">ODbL</a>)
       </p>
+
+      {list && sharing === list.id && (
+        <ShareSheet
+          what={`listę „${list.name}”`}
+          emails={(shares[list.id] ?? []).filter((m) => m !== email)}
+          owner={list.owner_id === userId}
+          ownerEmail={list.owner_email}
+          onAdd={(m) => shareAdd(list, m)}
+          onRemove={(m) => shareRemove(list, m)}
+          onLeave={() => leave(list)}
+          onClose={() => setSharing(null)}
+        />
+      )}
 
       {toast && (
         <div className={`toast ${s.toast}`} role="status">
