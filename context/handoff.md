@@ -57,6 +57,16 @@ Rafał wants the app to grow into a personal assistant (later possibly with AI v
 - Reminders: cron `*/10 * * * *` (kind `reminders`) → `sendCalendarReminders` sends reminders due in the last 30 min to the owner and every account the calendar is shared with (`calendar_recipients`, service role only); `calendar_reminders_sent` prevents duplicates. All-day events are reminded as if they started at 08:00.
 - Migration `20261111160000_calendar.sql` (rollback in `supabase/rollback/`).
 
+## Expenses from receipts (2026-11-11)
+
+- `/wydatki` (`src/features/expenses/`), switched with `/zakupy` by the "Listy / Wydatki" control (the Zakupy tab lights up for both). Budgets (`expense_books`) are shared by e-mail like calendars (`expense_book_shares`); every user gets "Domowe" on the first visit.
+- New expense: photo → the app shrinks it to a JPEG ≤ 1600 px / 900 KB → `POST /api/receipts/read` → Workers AI (`@cf/meta/llama-4-scout-17b-16e-instruct`, binding `AI` in `wrangler.jsonc`, JSON schema output with a plain-text fallback) → the user checks shop, date, total, category and lines → save. Or "+ Ręcznie" without a photo. Output validation and list matching: `src/lib/receipt.ts`.
+- Link to a shopping list: the list with the most matching unchecked items is suggested; matched items are ticked off and get the receipt price.
+- Photos: private Storage bucket `receipts`, path `<book id>/<expense id>.jpg`, access through `receipt_access(name)` (same people as the budget). No delete policy: a photo stays with its soft-removed expense.
+- Monthly summary: total, change vs the previous month, categories, top shops.
+- `next.config.ts` calls `initOpenNextCloudflareForDev({ remoteBindings: false })`, so `next dev`/`next build` need no Cloudflare login; receipt reading works only on the deployed Worker.
+- Migration `20261111180000_expenses.sql` (rollback in `supabase/rollback/`).
+
 ## Next step
 
 ```

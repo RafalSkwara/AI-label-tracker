@@ -1,10 +1,12 @@
 import { supabase } from "@/lib/supabase";
 
 /** Share tables: one row per (shared thing, recipient e-mail). RLS: the owner adds/removes, a recipient may remove only their own row. */
-export type ShareKind = { table: "shopping_list_shares"; key: "list_id" } | { table: "supply_tab_shares"; key: "tab_id" } | { table: "calendar_shares"; key: "calendar_id" };
+export type ShareKind = { table: "shopping_list_shares"; key: "list_id" } | { table: "supply_tab_shares"; key: "tab_id" } | { table: "calendar_shares"; key: "calendar_id" }
+  | { table: "expense_book_shares"; key: "book_id" };
 export const SHOPPING: ShareKind = { table: "shopping_list_shares", key: "list_id" };
 export const SUPPLIES: ShareKind = { table: "supply_tab_shares", key: "tab_id" };
 export const CALENDARS: ShareKind = { table: "calendar_shares", key: "calendar_id" };
+export const EXPENSES: ShareKind = { table: "expense_book_shares", key: "book_id" };
 
 /** Recipient e-mails by shared-thing id */
 export type Shares = Record<string, string[]>;

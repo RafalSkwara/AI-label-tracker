@@ -28,7 +28,7 @@ export default function AppNav({ can, email }: { can: (role: AppRole) => boolean
         <ul>
           {SECTIONS.filter((s) => ok(s.role)).map((s) => (
             <li key={s.href}>
-              <Link href={s.href} aria-current={path === s.href ? "page" : undefined}>
+              <Link href={s.href} aria-current={path === s.href || s.also?.includes(path) ? "page" : undefined}>
                 <Icon name={s.icon} />{s.label}
               </Link>
             </li>

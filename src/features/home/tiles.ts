@@ -8,5 +8,6 @@ export const TILES: Tile[] = [
   { href: "/dashboard", icon: "gauge", title: "Kanały", desc: "YouTube, muzyka, zadania i koszty", role: "dashboard" },
   { href: "/kalendarz", icon: "calendar", title: "Kalendarz", desc: "Wydarzenia, przypomnienia i płatności", role: null },
   { href: "/zakupy", icon: "cart", title: "Zakupy", desc: "Twoje i udostępnione listy", role: null },
+  { href: "/wydatki", icon: "receipt", title: "Wydatki", desc: "Paragony i miesięczne podsumowanie", role: null },
   { href: "/zapasy", icon: "box", title: "Zapasy", desc: "Domowe zapasy", role: "zapasy" },
 ];

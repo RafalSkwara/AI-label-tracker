@@ -9,5 +9,6 @@
 		"binding": "ASSETS"
 	},
 	"triggers": { "crons": ["0 5 * * *", "30 * * * *", "0 7 * * *", "*/10 * * * *"] },
+	"ai": { "binding": "AI" },
 	"observability": { "enabled": true }
 }
