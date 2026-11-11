@@ -1,10 +1,14 @@
-import { requireOwner } from "@/lib/server/auth";
+import { ownedProjects } from "@/lib/server/auth";
 import { serviceDb } from "@/lib/server/db";
-import { syncAll } from "@/lib/server/ytSync";
+import { type SyncResult, syncAll } from "@/lib/server/ytSync";
 
-/** Owner-only manual sync ("Synchronizuj teraz"); body { projectId? } limits it to one project */
+/** Manual sync ("Synchronizuj teraz") of the caller's own projects; body { projectId? } limits it to one of them */
 export async function POST(req: Request) {
-  if (!(await requireOwner(req))) return Response.json({ error: "unauthorized" }, { status: 401 });
+  const mine = await ownedProjects(req);
+  if (!mine) return Response.json({ error: "unauthorized" }, { status: 401 });
   const { projectId } = (await req.json().catch(() => ({}))) as { projectId?: string };
-  return Response.json({ results: await syncAll(serviceDb(), projectId) });
+  if (projectId && !mine.includes(projectId)) return Response.json({ error: "forbidden" }, { status: 403 });
+  const db = serviceDb(), results: SyncResult[] = [];
+  for (const id of projectId ? [projectId] : mine) results.push(...(await syncAll(db, id)));
+  return Response.json({ results });
 }

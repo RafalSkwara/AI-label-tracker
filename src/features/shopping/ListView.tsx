@@ -17,7 +17,13 @@ type Props = {
   onBack: () => void;
   onRename: (name: string) => void;
   onArchive: () => void;
-  onShare: () => void;
+  /** send the open items as text (system share sheet or clipboard) */
+  onSendText: () => void;
+  /** the caller owns the list (only the owner renames, archives and shares) */
+  owner: boolean;
+  /** "Udostępniona 2 osobom" / "od x@y.pl" / "" */
+  shareInfo: string;
+  onSharing: () => void;
   onAdd: (name: string, quantity: string | null, barcode: string | null) => Promise<void>;
   flash: (msg: string) => void;
   onPatch: (item: ShoppingItem, patch: Patch) => void;
@@ -161,10 +167,13 @@ export default function ListView(p: Props) {
         </form>
       ) : (
         <div className={s.titlerow}>
-          <button className={s.titlebtn} onClick={() => setTitle(list.name)} aria-label={`Zmień nazwę listy: ${list.name}`}>
-            <h1 className={s.title}>{list.name}</h1>
-            <span className={s.pen} aria-hidden="true">✎</span>
-          </button>
+          {p.owner ? (
+            <button className={s.titlebtn} onClick={() => setTitle(list.name)} aria-label={`Zmień nazwę listy: ${list.name}`}>
+              <h1 className={s.title}>{list.name}</h1>
+              <span className={s.pen} aria-hidden="true">✎</span>
+            </button>
+          ) : <h1 className={s.title}>{list.name}</h1>}
+          <button className={s.sharedbtn} onClick={p.onSharing}>👥 {p.shareInfo || "Tylko Ty · udostępnij"}</button>
           {items.length > 0 && (
             <span className="sub">
               {todo.length === 0 ? "wszystko kupione" : `do kupienia: ${todo.length}`}
@@ -177,10 +186,11 @@ export default function ListView(p: Props) {
 
       {menu && (
         <div className={s.menu}>
-          <button className="btn" onClick={() => { setMenu(false); p.onShare(); }} disabled={todo.length === 0}>Udostępnij listę</button>
-          <button className="btn" onClick={() => { setMenu(false); setTitle(list.name); }}>Zmień nazwę</button>
+          <button className="btn" onClick={() => { setMenu(false); p.onSharing(); }}>{p.owner ? "Udostępnij osobom" : "Kto ma dostęp"}</button>
+          <button className="btn" onClick={() => { setMenu(false); p.onSendText(); }} disabled={todo.length === 0}>Wyślij jako tekst</button>
+          {p.owner && <button className="btn" onClick={() => { setMenu(false); setTitle(list.name); }}>Zmień nazwę</button>}
           <button className="btn" disabled={done.length === 0} onClick={() => { setMenu(false); p.onClearChecked(done); }}>Usuń kupione</button>
-          <button className="btn danger" onClick={() => { if (confirm(`Przenieść listę „${list.name}” do archiwum?`)) p.onArchive(); }}>Archiwizuj listę</button>
+          {p.owner && <button className="btn danger" onClick={() => { if (confirm(`Przenieść listę „${list.name}” do archiwum?`)) p.onArchive(); }}>Archiwizuj listę</button>}
         </div>
       )}
 

@@ -17,7 +17,6 @@ const TABS = [
   { id: "pipeline", name: "Pipeline", coll: "items" },
   { id: "tygodnie", name: "Tygodnie", coll: "weeks" },
   { id: "koszty", name: "Koszty", coll: "subs" },
-  { id: "subskrypcje", name: "Subskrypcje", coll: "subs" },
   { id: "muzyka", name: "Muzyka", coll: "none" },
 ] as const;
 type TabId = (typeof TABS)[number]["id"];
@@ -33,7 +32,8 @@ export default function Tracker({ email }: { email: string }) {
   const [tab, setTab] = useState<TabId>(() => {
     const ok = (s: string | null) => TABS.some((t) => t.id === s);
     try {
-      const q = new URL(window.location.href).searchParams.get("tab");
+      let q = new URL(window.location.href).searchParams.get("tab");
+      if (q === "subskrypcje") q = "koszty"; // old links: subscriptions are part of Koszty now
       if (ok(q)) return q as TabId;
     } catch {}
     try { const s = sessionStorage.getItem("tab"); if (ok(s)) return s as TabId; } catch {}
@@ -97,7 +97,7 @@ export default function Tracker({ email }: { email: string }) {
     if (!data) return;
     const find = <T extends { id: string }>(l: T[]) => l.find((x) => x.id === a.ref);
     if (a.kind === "task_late" || a.kind === "task_soon") { const t = find(data.tasks); if (t) setEditing({ coll: "tasks", rec: t }); else pickTab("zadania"); }
-    else if (a.kind === "renewal") { const s = find(data.subs); if (s) setEditing({ coll: "subs", rec: s }); else pickTab("subskrypcje"); }
+    else if (a.kind === "renewal") { const s = find(data.subs); if (s) setEditing({ coll: "subs", rec: s }); else pickTab("koszty"); }
     else if (a.kind === "ctr_low") { const i = find(data.items); if (i) setEditing({ coll: "items", rec: i }); else pickTab("tygodnie"); }
     else if (a.kind === "impressions_drop") pickTab("tygodnie");
     else if (a.kind === "automation") pickTab("pipeline");
@@ -148,7 +148,6 @@ export default function Tracker({ email }: { email: string }) {
             {tab === "koszty" && <CostsPanel data={data} onAdd={() => setEditing({ coll: "subs", rec: null })} onEdit={(s) => setEditing({ coll: "subs", rec: s })}
               onSettings={(k, v) => run(() => saveSettings({ [k]: v }), "Zapisano ustawienia")} />}
             {tab === "muzyka" && <RoyaltiesPanel data={data} flash={flash} />}
-            {tab === "subskrypcje" && <SubsPanel data={data} onAdd={() => setEditing({ coll: "subs", rec: null })} onEdit={(s) => setEditing({ coll: "subs", rec: s })} />}
           </main>
         </>
       )}
@@ -310,6 +309,10 @@ function CostsPanel({ data, onAdd, onEdit, onSettings }: { data: Data; onAdd: ()
   const c = costTotals(data), st = data.settings;
   const pname = (id: string | null) => data.projects.find((p) => p.id === id)?.name;
   const order: Record<string, number> = { aktywna: 0, planowana: 1, anulowana: 2 };
+  const act = data.subs.filter((s) => s.status === "aktywna");
+  const next = act.filter((s) => s.renew && daysTo(s.renew) >= 0).sort((a, b) => a.renew!.localeCompare(b.renew!))[0];
+  const rel = (d: string) => { const n = daysTo(d); return n === 0 ? "dziś" : n > 0 ? `za ${n} ${n === 1 ? "dzień" : "dni"}` : `${-n} ${n === -1 ? "dzień" : "dni"} temu`; };
+  const row = (l: string, v: React.ReactNode) => <><dt className="label">{l}</dt><dd>{v}</dd></>;
   const field = (k: keyof Settings, l: string, step = "1") => (
     <div className="field" key={k}>
       <label className="label" htmlFor={"set-" + k}>{l}</label>
@@ -318,54 +321,17 @@ function CostsPanel({ data, onAdd, onEdit, onSettings }: { data: Data; onAdd: ()
   );
   return (
     <>
-      <Head title="Koszty" sub="Ceny netto w USD przeliczane z VAT; plany roczne rozłożone na miesiące" noun={NOUN.subs} onAdd={onAdd} />
+      <Head title="Koszty i subskrypcje" sub="Ceny netto w USD przeliczane z VAT; plany roczne rozłożone na miesiące" noun={NOUN.subs} onAdd={onAdd} />
       <div className="totals">
         <div><div className="label">Razem / mies.</div><div className="num" style={{ fontSize: "1.3rem" }}>{pln(c.total)}</div></div>
-        <div><div className="label">Aktywne</div><div className="num">{pln(c.active)}</div></div>
+        <div><div className="label">Aktywne ({act.length})</div><div className="num">{pln(c.active)}</div></div>
         <div><div className="label">Planowane</div><div className="num">{pln(c.planned)}</div></div>
         <div><div className="label">Zapas do max budżetu</div><div className={"num " + (st.budget_max - c.total < 0 ? "down" : "")}>{pln(st.budget_max - c.total)}</div></div>
+        <div><div className="label">Najbliższa płatność</div><div className="num">{next ? `${next.name} · ${dmy(next.renew)}` : "—"}</div></div>
       </div>
       {!data.subs.length ? <Empty title="Brak subskrypcji" body="Dodaj Suno, Midjourney, Kling i DistroKid, żeby zobaczyć koszt miesięczny." /> : (
-        <div className="subs">
-          {[...data.subs].sort((a, b) => (order[a.status] ?? 3) - (order[b.status] ?? 3) || monthly(b, st) - monthly(a, st)).map((s) => (
-            <button key={s.id} className={"subrow" + (s.status === "anulowana" ? " cancel" : "")} onClick={() => onEdit(s)}>
-              <div style={{ minWidth: 0 }}>
-                <div className="n">{s.name + (s.plan ? " · " + s.plan : "") + (pname(s.project_id) ? " · " + pname(s.project_id) : "")}</div>
-                <div className="p">{`${nf(2).format(Number(s.price) || 0)} ${s.currency} / ${s.cycle === "rok" ? "rok" : "mies."}` + (s.note ? " · " + s.note : "")}</div>
-              </div>
-              <span className={"st " + s.status}>{s.status}</span>
-              <span className="m">{pln(monthly(s, st))}</span>
-            </button>
-          ))}
-        </div>
-      )}
-      <div className="settings">
-        {field("usd_pln", "Kurs USD/PLN", "0.01")}{field("vat_pct", "VAT %")}{field("budget_min", "Budżet min (zł)")}{field("budget_max", "Budżet max (zł)")}
-        <p>VAT dolicza się tylko do cen w USD. Kurs zaktualizuj przy rozliczeniu miesiąca.</p>
-      </div>
-    </>
-  );
-}
-
-
-function SubsPanel({ data, onAdd, onEdit }: { data: Data; onAdd: () => void; onEdit: (s: Sub) => void }) {
-  const st = data.settings, order: Record<string, number> = { aktywna: 0, planowana: 1, anulowana: 2 };
-  const pname = (id: string | null) => data.projects.find((p) => p.id === id)?.name;
-  const act = data.subs.filter((s) => s.status === "aktywna");
-  const next = act.filter((s) => s.renew && daysTo(s.renew) >= 0).sort((a, b) => a.renew!.localeCompare(b.renew!))[0];
-  const rel = (d: string) => { const n = daysTo(d); return n === 0 ? "dziś" : n > 0 ? `za ${n} ${n === 1 ? "dzień" : "dni"}` : `${-n} ${n === -1 ? "dzień" : "dni"} temu`; };
-  const row = (l: string, v: React.ReactNode) => <><dt className="label">{l}</dt><dd>{v}</dd></>;
-  return (
-    <>
-      <Head title="Subskrypcje" sub="Przegląd usług: od kiedy, do kiedy opłacone, następna płatność i link do panelu" noun={NOUN.subs} onAdd={onAdd} />
-      <div className="totals">
-        <div><div className="label">Aktywne subskrypcje</div><div className="num">{act.length}</div></div>
-        <div><div className="label">Najbliższa płatność</div><div className="num">{next ? `${next.name} · ${dmy(next.renew)}` : "—"}</div></div>
-        <div><div className="label">Koszt aktywnych / mies.</div><div className="num">{pln(costTotals(data).active)}</div></div>
-      </div>
-      {!data.subs.length ? <Empty title="Brak subskrypcji" body="Dodaj pierwszą subskrypcję przyciskiem powyżej." /> : (
         <div className="subcards">
-          {[...data.subs].sort((a, b) => (order[a.status] ?? 3) - (order[b.status] ?? 3) || (a.renew ?? "9").localeCompare(b.renew ?? "9")).map((s) => (
+          {[...data.subs].sort((a, b) => (order[a.status] ?? 3) - (order[b.status] ?? 3) || monthly(b, st) - monthly(a, st)).map((s) => (
             <div key={s.id} className={"card subcard" + (s.status === "anulowana" ? " cancel" : "")} role="button" tabIndex={0}
               onClick={() => onEdit(s)} onKeyDown={(e) => { if (e.key === "Enter" && e.target === e.currentTarget) onEdit(s); }}>
               <div className="head">
@@ -378,12 +344,17 @@ function SubsPanel({ data, onAdd, onEdit }: { data: Data; onAdd: () => void; onE
                 {row("Opłacone do", dmy(s.paid_until))}
                 {row("Następna płatność", s.renew ? <>{dmy(s.renew)} <span className={daysTo(s.renew) < 0 ? "down" : "sub"}>({rel(s.renew)})</span></> : "—")}
               </dl>
+              {s.note && <p className="details">{s.note}</p>}
               {s.plan_details && <p className="details">{s.plan_details}</p>}
               {s.dashboard_url && /^https?:\/\//.test(s.dashboard_url) && <a href={s.dashboard_url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>Otwórz dashboard</a>}
             </div>
           ))}
         </div>
       )}
+      <div className="settings">
+        {field("usd_pln", "Kurs USD/PLN", "0.01")}{field("vat_pct", "VAT %")}{field("budget_min", "Budżet min (zł)")}{field("budget_max", "Budżet max (zł)")}
+        <p>VAT dolicza się tylko do cen w USD. Kurs zaktualizuj przy rozliczeniu miesiąca.</p>
+      </div>
     </>
   );
 }

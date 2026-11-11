@@ -1,0 +1,10 @@
+.sheet{display:grid;gap:12px}
+.people{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.person{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:48px;padding:4px 4px 4px 12px;background:var(--sunk);border-radius:8px}
+.mail{overflow-wrap:anywhere;min-width:0}
+.person :global(.btn){flex:none;min-height:40px}
+.sheet .add{display:flex;gap:6px;min-width:0}
+.add input{flex:1 1 auto;min-width:0;min-height:44px;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:0 12px}
+.add :global(.btn){min-height:44px;flex:none}
+.err{color:var(--bad);font-size:.85rem;margin:0}
+.badge{display:inline-flex;align-items:center;gap:4px;font-size:.76rem;color:var(--accent)}

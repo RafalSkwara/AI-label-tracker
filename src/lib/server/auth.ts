@@ -15,12 +15,14 @@ async function callerDb(req: Request) {
   return error || !user.user ? null : { db, userId: user.user.id };
 }
 
-/** Verifies the Supabase access token in `Authorization: Bearer` and that its user may use the dashboard (RLS helper is_owner = dashboard or admin role) */
-export async function requireOwner(req: Request): Promise<boolean> {
+/** Dashboard user's own project ids (RLS: owner_id = caller); null when the caller may not use the dashboard */
+export async function ownedProjects(req: Request): Promise<string[] | null> {
   const c = await callerDb(req);
-  if (!c) return false;
-  const { data } = await c.db.rpc("is_owner");
-  return data === true;
+  if (!c) return null;
+  const { data: ok } = await c.db.rpc("is_owner");
+  if (ok !== true) return null;
+  const { data, error } = await c.db.from("projects").select("id");
+  return error ? null : (data ?? []).map((r) => r.id as string);
 }
 
 /** Same check for any app role (admin passes every role); returns the caller's user id */

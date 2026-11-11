@@ -1,7 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import type { ItemFields, Status, SupplyItem, SupplyTab, TabFields } from "./types";
 
-const TAB_COLS = "id,name,description,sort_order,archived,updated_at";
+const TAB_COLS = "id,owner_id,owner_email,name,description,sort_order,archived,updated_at";
 const ITEM_COLS = "id,tab_id,category,name,quantity,details,price_min,price_max,price_label,own_price,checked,checked_initial,removed,sort_order,updated_at";
 
 export async function loadSupplies(): Promise<{ tabs: SupplyTab[]; items: SupplyItem[] }> {
