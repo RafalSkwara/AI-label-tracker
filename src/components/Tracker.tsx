@@ -6,6 +6,7 @@ import { daysTo, dfmt, dmy, inDays, localDateTime, nf, num, pln, today } from "@
 import { costTotals, monthly, weeksAgg } from "@/lib/money";
 import type { Coll, Data, Item, Settings, Sub, Task, Week } from "@/lib/types";
 import { type Alert, alerts, awaitingApproval } from "@/lib/rules";
+import PushToggle from "@/features/push/PushToggle";
 import RoyaltiesPanel from "./RoyaltiesPanel";
 import Sheet from "./Sheet";
 import Overview from "./Overview";
@@ -146,7 +147,7 @@ export default function Tracker({ email }: { email: string }) {
             {tab === "pipeline" && <PipelinePanel data={data} onAdd={() => setEditing({ coll: "items", rec: null })} onEdit={(i) => setEditing({ coll: "items", rec: i })} />}
             {tab === "tygodnie" && <WeeksPanel data={data} onAdd={() => setEditing({ coll: "weeks", rec: null })} onEdit={(w) => setEditing({ coll: "weeks", rec: w })} />}
             {tab === "koszty" && <CostsPanel data={data} onAdd={() => setEditing({ coll: "subs", rec: null })} onEdit={(s) => setEditing({ coll: "subs", rec: s })}
-              onSettings={(k, v) => run(() => saveSettings({ [k]: v }), "Zapisano ustawienia")} />}
+              onSettings={(k, v) => run(() => saveSettings({ [k]: v }), "Zapisano ustawienia")} flash={flash} />}
             {tab === "muzyka" && <RoyaltiesPanel data={data} flash={flash} />}
           </main>
         </>
@@ -305,7 +306,7 @@ function WeeksPanel({ data, onAdd, onEdit }: { data: Data; onAdd: () => void; on
   );
 }
 
-function CostsPanel({ data, onAdd, onEdit, onSettings }: { data: Data; onAdd: () => void; onEdit: (s: Sub) => void; onSettings: (k: keyof Settings, v: number) => void }) {
+function CostsPanel({ data, onAdd, onEdit, onSettings, flash }: { data: Data; onAdd: () => void; onEdit: (s: Sub) => void; onSettings: (k: keyof Settings, v: number) => void; flash: (msg: string) => void }) {
   const c = costTotals(data), st = data.settings;
   const pname = (id: string | null) => data.projects.find((p) => p.id === id)?.name;
   const order: Record<string, number> = { aktywna: 0, planowana: 1, anulowana: 2 };
@@ -329,6 +330,7 @@ function CostsPanel({ data, onAdd, onEdit, onSettings }: { data: Data; onAdd: ()
         <div><div className="label">Zapas do max budżetu</div><div className={"num " + (st.budget_max - c.total < 0 ? "down" : "")}>{pln(st.budget_max - c.total)}</div></div>
         <div><div className="label">Najbliższa płatność</div><div className="num">{next ? `${next.name} · ${dmy(next.renew)}` : "—"}</div></div>
       </div>
+      <PushToggle flash={flash} />
       {!data.subs.length ? <Empty title="Brak subskrypcji" body="Dodaj Suno, Midjourney, Kling i DistroKid, żeby zobaczyć koszt miesięczny." /> : (
         <div className="subcards">
           {[...data.subs].sort((a, b) => (order[a.status] ?? 3) - (order[b.status] ?? 3) || monthly(b, st) - monthly(a, st)).map((s) => (
