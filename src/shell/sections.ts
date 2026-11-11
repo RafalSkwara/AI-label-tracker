@@ -5,6 +5,7 @@ import type { AppRole } from "./useRoles";
 export const SECTIONS: { href: string; label: string; icon: IconName; role: AppRole | null }[] = [
   { href: "/", label: "Start", icon: "home", role: null },
   { href: "/dashboard", label: "Kanały", icon: "gauge", role: "dashboard" },
+  { href: "/kalendarz", label: "Kalendarz", icon: "calendar", role: null },
   { href: "/zakupy", label: "Zakupy", icon: "cart", role: null },
   { href: "/zapasy", label: "Zapasy", icon: "box", role: "zapasy" },
 ];
