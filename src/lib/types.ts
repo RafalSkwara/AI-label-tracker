@@ -121,8 +121,6 @@ export type PipelineRun = {
 
 export type Settings = { budget_min: number; budget_max: number; usd_pln: number; vat_pct: number };
 
-export type XpEvent = { kind: string; ref: string; title: string; at: string; xp: number };
-
 export type Data = {
   tasks: Task[];
   items: Item[];
@@ -136,7 +134,6 @@ export type Data = {
   terms: SearchTermRow[];
   views24: Views24[];
   settings: Settings;
-  xp: XpEvent[];
   runs: PipelineRun[];
 };
 

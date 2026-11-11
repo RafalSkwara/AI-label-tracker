@@ -1,6 +1,6 @@
 # Side Hustle Assistant
 
-Personal assistant and dashboard for side-hustle projects (AI music YouTube channels and artists): rule-based alerts, YouTube sync, tasks, content pipeline, weekly KPIs, costs, plus XP, levels and badges. Mobile-first PWA, served at `https://side-hustle-assistant.sidereus.workers.dev`.
+Personal assistant and dashboard for side-hustle projects (AI music YouTube channels and artists): rule-based alerts, YouTube sync, tasks, content pipeline, weekly KPIs and costs. Mobile-first PWA, served at `https://side-hustle-assistant.sidereus.workers.dev`.
 
 - Next.js 16 (App Router, client-rendered) on Cloudflare Workers via [OpenNext](https://opennext.js.org/cloudflare)
 - Supabase (project `gigsqrnwyeioqlkngfqe`): Postgres + Auth. Every table has RLS; only emails listed in `public.app_owners` can read or write.
@@ -42,6 +42,6 @@ It uses an already installed Chrome/Chromium (`E2E_CHROMIUM` overrides the path)
 | `content_items` | films, EPs, shorts; `live_at` set by trigger, `yt_video_id` for the F2 YouTube sync |
 | `weekly_stats` | key `(channel_id, week_start)`, `source` = `manual` or `yt_api` |
 | `subscriptions`, `settings` | costs and budget |
-| `v_xp_events` | XP per event: task 10, film 50, EP 40, short 15, week 5 |
+| `v_xp_events` | Unused since 2026-11-11 (gamification removed); kept until a cleanup migration |
 
 "Delete" sets `archived_at`; rows are never removed from the app.

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { archiveRow, loadAll, saveRow, saveSettings, setTaskDone } from "@/lib/data";
 import { daysTo, dfmt, dmy, inDays, localDateTime, nf, num, pln, today } from "@/lib/format";
-import { XP_PER_LEVEL, badges, costTotals, levelName, levelOf, monthly, streak, totalHours, totalSubs, trend, weeksAgg, xpTotal } from "@/lib/game";
+import { costTotals, monthly, totalHours, totalSubs, trend, weeksAgg } from "@/lib/game";
 import type { Coll, Data, Item, Settings, Sub, Task, Week } from "@/lib/types";
 import { type Alert, alerts, awaitingApproval } from "@/lib/rules";
 import RoyaltiesPanel from "./RoyaltiesPanel";
@@ -41,26 +41,20 @@ export default function Tracker({ email }: { email: string }) {
     return "dzis";
   });
   const [editing, setEditing] = useState<Editing>(null);
-  const [toast, setToast] = useState<{ msg: string; xp?: boolean } | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
   const loadedAt = useRef(0);
-  const prevXp = useRef<number | null>(null);
 
-  const flash = useCallback((msg: string, xp?: boolean) => {
-    setToast({ msg, xp });
+  const flash = useCallback((msg: string) => {
+    setToast(msg);
     setTimeout(() => setToast(null), 2800);
   }, []);
 
   const apply = useCallback((d: Data) => {
-    const after = xpTotal(d), before = prevXp.current;
-    if (before != null && after > before) {
-      flash(levelOf(after) > levelOf(before) ? `Poziom ${levelOf(after) + 1}: ${levelName(levelOf(after))}!` : `+${after - before} XP`, true);
-    }
-    prevXp.current = after;
     loadedAt.current = Date.now();
     setData(d);
     setError("");
     setBusy(false);
-  }, [flash]);
+  }, []);
   const fail = useCallback((e: unknown) => { setError((e as Error).message); setBusy(false); }, []);
 
   const load = useCallback(async () => {
@@ -107,8 +101,6 @@ export default function Tracker({ email }: { email: string }) {
 
   const alertList = useMemo(() => (data ? alerts(data, today()) : []), [data]);
 
-  const xp = data ? xpTotal(data) : 0, lvl = levelOf(xp), into = xp - lvl * XP_PER_LEVEL;
-
   return (
     <div className="wrap">
       <header className="top">
@@ -132,38 +124,6 @@ export default function Tracker({ email }: { email: string }) {
 
       {data && (
         <>
-          <section className="progress" aria-label="Postęp">
-            <div>
-              <div className="lvl">
-                <span className="badge num">{lvl + 1}</span>
-                <div style={{ minWidth: 0, flex: 1 }}>
-                  <div className="name">{levelName(lvl)}</div>
-                  <div className="sub num">{nf().format(xp)} XP · {XP_PER_LEVEL - into} do poziomu {lvl + 2}</div>
-                </div>
-              </div>
-              <div className="xpbar" role="progressbar" aria-label="Postęp do następnego poziomu" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round((into / XP_PER_LEVEL) * 100)}>
-                <i style={{ width: (into / XP_PER_LEVEL) * 100 + "%" }} />
-              </div>
-              <div className="facts">
-                <div><div className="label">Seria tygodni z filmem</div><div className="v">{streak(data)}</div></div>
-                <div><div className="label">Do YPP (godziny)</div><div className="v">{nf().format(Math.max(0, 4000 - totalHours(data)))}</div></div>
-                <div><div className="label">Odznaki</div><div className="v">{badges(data).filter((b) => b.on).length}/{badges(data).length}</div></div>
-              </div>
-              <div className="badges">
-                {badges(data).map((b) => <span key={b.n} className={"bd" + (b.on ? " on" : "")} title={b.hint}>{(b.on ? "★ " : "") + b.n}</span>)}
-              </div>
-            </div>
-            <div>
-              <span className="label">Ostatnie XP</span>
-              <div className="feed">
-                {data.xp.length ? data.xp.slice(0, 6).map((e) => (
-                  <div key={e.kind + e.ref}><span>{e.title}</span><span className="xp">+{e.xp}</span></div>
-                )) : <div><span>Odhacz pierwsze zadanie, żeby zdobyć XP.</span></div>}
-              </div>
-              <p className="sub" style={{ fontSize: ".8rem", margin: 0 }}>Zadanie +10 · film +50 · EP +40 · short +15 · wpisany tydzień +5</p>
-            </div>
-          </section>
-
           <Strip data={data} />
 
           <nav className="tabs" role="tablist">
@@ -201,7 +161,7 @@ export default function Tracker({ email }: { email: string }) {
           onDelete={() => { const e = editing; setEditing(null); if (e.rec) run(() => archiveRow(e.coll, e.rec!), "Usunięto"); }} />
       )}
 
-      {toast && <div className={"toast" + (toast.xp ? " xp" : "")} role="status">{toast.msg}</div>}
+      {toast && <div className="toast" role="status">{toast}</div>}
     </div>
   );
 }
@@ -241,7 +201,7 @@ function TasksPanel({ data, onAdd, onEdit, onToggle }: { data: Data; onAdd: () =
   const pname = (id: string | null) => data.projects.find((p) => p.id === id)?.name;
   return (
     <>
-      <Head title="Zadania" sub="Każde odhaczone zadanie to +10 XP" noun={NOUN.tasks} onAdd={onAdd} />
+      <Head title="Zadania" sub="Lista zadań i terminy" noun={NOUN.tasks} onAdd={onAdd} />
       {!data.tasks.length && <Empty title="Brak zadań" body="Dodaj pierwsze zadanie przyciskiem powyżej." />}
       {(["F0", "F1", "F2", "F3"] as const).map((ph) => {
         const list = data.tasks.filter((t) => t.phase === ph).sort((a, b) =>
@@ -269,7 +229,7 @@ function PipelinePanel({ data, onAdd, onEdit }: { data: Data; onAdd: () => void;
   const chan = (id: string | null) => data.projects.find((c) => c.id === id)?.name;
   return (
     <>
-      <Head title="Pipeline" sub="Film live to +50 XP, short +15, EP +40" noun={NOUN.items} onAdd={onAdd} />
+      <Head title="Pipeline" sub="Filmy, EP-ki i shorty" noun={NOUN.items} onAdd={onAdd} />
       <Automation data={data} />
       {!data.items.length ? <Empty title="Pipeline jest pusty" body="Dodaj pierwszy film, np. jesienną scenę na weekend." /> : (
         <div className="board">
@@ -332,7 +292,7 @@ function WeeksPanel({ data, onAdd, onEdit }: { data: Data; onAdd: () => void; on
   const f = (v: number | null, d: number, suffix = "") => (num(v) == null ? "—" : nf(d).format(Number(v)) + suffix);
   return (
     <>
-      <Head title="Tygodnie" sub="Dane z YouTube Studio co poniedziałek, +5 XP za wpis. W F2 uzupełni je automat." noun={NOUN.weeks} onAdd={onAdd} />
+      <Head title="Tygodnie" sub="Dane z YouTube, synchronizowane codziennie" noun={NOUN.weeks} onAdd={onAdd} />
       {!w.length ? <Empty title="Brak danych tygodniowych" body="Po pierwszym tygodniu od publikacji wpisz godziny oglądania, wyświetlenia, CTR i średni czas oglądania." /> : (
         <>
           <div className="chartbox"><span className="label">Godziny oglądania / tydzień</span><WeeksChart weeks={weeksAgg(data.weeks)} /></div>
