@@ -26,14 +26,3 @@ export function weeksAgg(weeks: Week[]) {
   }
   return [...m.values()].sort((a, b) => (a.week_start < b.week_start ? -1 : 1));
 }
-export function trend(weeks: Week[]) {
-  const w = weeksAgg(weeks);
-  if (w.length < 2) return null;
-  const a = w[w.length - 2].watch_hours, b = w[w.length - 1].watch_hours;
-  if (a == null || b == null) return null;
-  if (a === 0) return b > 0 ? { pct: null, dir: "up" as const } : { pct: 0, dir: "flat" as const };
-  const pct = ((b - a) / a) * 100;
-  return { pct, dir: pct > 2 ? ("up" as const) : pct < -2 ? ("down" as const) : ("flat" as const) };
-}
-export const totalHours = (d: Data) => d.weeks.reduce((s, w) => s + (num(w.watch_hours) ?? 0), 0);
-export const totalSubs = (d: Data) => d.weeks.reduce((s, w) => s + (num(w.subs_net) ?? 0), 0);

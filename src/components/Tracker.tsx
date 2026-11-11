@@ -3,16 +3,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { archiveRow, loadAll, saveRow, saveSettings, setTaskDone } from "@/lib/data";
 import { daysTo, dfmt, dmy, inDays, localDateTime, nf, num, pln, today } from "@/lib/format";
-import { costTotals, monthly, totalHours, totalSubs, trend, weeksAgg } from "@/lib/game";
+import { costTotals, monthly, weeksAgg } from "@/lib/money";
 import type { Coll, Data, Item, Settings, Sub, Task, Week } from "@/lib/types";
 import { type Alert, alerts, awaitingApproval } from "@/lib/rules";
 import RoyaltiesPanel from "./RoyaltiesPanel";
 import Sheet from "./Sheet";
-import Today from "./Today";
+import Overview from "./Overview";
 import WeeksChart from "./WeeksChart";
 
 const TABS = [
-  { id: "dzis", name: "Dziś", coll: null },
+  { id: "dzis", name: "Przegląd", coll: null },
   { id: "zadania", name: "Zadania", coll: "tasks" },
   { id: "pipeline", name: "Pipeline", coll: "items" },
   { id: "tygodnie", name: "Tygodnie", coll: "weeks" },
@@ -33,13 +33,17 @@ export default function Tracker({ email }: { email: string }) {
   const [tab, setTab] = useState<TabId>(() => {
     const ok = (s: string | null) => TABS.some((t) => t.id === s);
     try {
-      const u = new URL(window.location.href), q = u.searchParams.get("tab");
-      if (q != null) { u.searchParams.delete("tab"); history.replaceState(null, "", u.pathname + u.search + u.hash); } // keep other params, e.g. yt
+      const q = new URL(window.location.href).searchParams.get("tab");
       if (ok(q)) return q as TabId;
     } catch {}
     try { const s = sessionStorage.getItem("tab"); if (ok(s)) return s as TabId; } catch {}
     return "dzis";
   });
+  // Drop ?tab= after reading it (outside render: replaceState during render updates the router mid-render); keep other params, e.g. yt
+  useEffect(() => {
+    const u = new URL(window.location.href);
+    if (u.searchParams.has("tab")) { u.searchParams.delete("tab"); history.replaceState(null, "", u.pathname + u.search + u.hash); }
+  }, []);
   const [editing, setEditing] = useState<Editing>(null);
   const [toast, setToast] = useState<string | null>(null);
   const loadedAt = useRef(0);
@@ -105,8 +109,7 @@ export default function Tracker({ email }: { email: string }) {
     <div className="wrap">
       <header className="top">
         <div>
-          <h1>Side Hustle Assistant</h1>
-          <p className="sub">{data?.projects.filter((p) => p.status === "aktywny").map((p) => p.name).join(" · ") || "Projekty"}</p>
+          <h1>Kanały</h1>
         </div>
         <div className="conn">
           <span className={"dot " + (error ? "off" : busy ? "busy" : "on")} />
@@ -124,8 +127,6 @@ export default function Tracker({ email }: { email: string }) {
 
       {data && (
         <>
-          <Strip data={data} />
-
           <nav className="tabs" role="tablist">
             {TABS.map((t) => (
               <button key={t.id} role="tab" id={"tab-" + t.id} aria-selected={tab === t.id} onClick={() => pickTab(t.id)}>
@@ -136,7 +137,7 @@ export default function Tracker({ email }: { email: string }) {
           </nav>
 
           <main className="panel" role="tabpanel" aria-labelledby={"tab-" + tab}>
-            {tab === "dzis" && <Today data={data} today={today()} list={alertList} onOpen={openAlert} onReload={load} flash={flash} />}
+            {tab === "dzis" && <Overview data={data} today={today()} list={alertList} onOpen={openAlert} onReload={load} flash={flash} />}
             {tab === "zadania" && <TasksPanel data={data} onAdd={() => setEditing({ coll: "tasks", rec: null })} onEdit={(t) => setEditing({ coll: "tasks", rec: t })}
               onToggle={(t, done) => {
                 setData({ ...data, tasks: data.tasks.map((x) => (x.id === t.id ? { ...x, done } : x)) });
@@ -166,25 +167,6 @@ export default function Tracker({ email }: { email: string }) {
   );
 }
 
-function Meter({ ratio }: { ratio: number }) {
-  const r = Math.max(0, ratio);
-  return <div className={"meter" + (r > 1 ? " over" : "")}><i style={{ width: Math.min(100, r * 100) + "%" }} /></div>;
-}
-
-function Strip({ data }: { data: Data }) {
-  const c = costTotals(data), st = data.settings, hours = totalHours(data), subs = totalSubs(data), t = trend(data.weeks), agg = weeksAgg(data.weeks);
-  return (
-    <section className="strip" aria-label="Podsumowanie">
-      <div className="stat"><span className="label">Koszt / mies.</span><span className="v">{pln(c.total)}</span><Meter ratio={st.budget_max ? c.total / st.budget_max : 0} />
-        <span className="d">budżet {nf().format(st.budget_min)}–{nf().format(st.budget_max)} zł · aktywne {pln(c.active)}</span></div>
-      <div className="stat"><span className="label">Godziny oglądania</span><span className="v">{nf(1).format(hours)}</span><Meter ratio={hours / 4000} /><span className="d">próg YPP 4 000 h</span></div>
-      <div className="stat"><span className="label">Trend t/t (godziny)</span>
-        <span className={"v " + (t?.dir ?? "")}>{!t ? "—" : t.pct == null ? "↑ nowe" : (t.pct > 0 ? "↑ +" : t.pct < 0 ? "↓ " : "→ ") + nf(0).format(t.pct) + "%"}</span>
-        <span className="d">{t ? "tydzień od " + dfmt(agg[agg.length - 1].week_start) : "potrzeba 2 tygodni danych"}</span></div>
-      <div className="stat"><span className="label">Subskrybenci</span><span className="v">{nf().format(subs)}</span><Meter ratio={subs / 1000} /><span className="d">próg YPP 1 000</span></div>
-    </section>
-  );
-}
 
 function Head({ title, sub, noun, onAdd }: { title: string; sub: string; noun: string; onAdd: () => void }) {
   return (

@@ -167,10 +167,11 @@ export function mapStats(json: { items?: { id: string; statistics?: { viewCount?
 }
 
 /** Display groups for the traffic sources, in the order the app lists them */
-export const TRAFFIC_GROUPS = ["Sugerowane", "Wyszukiwarka", "Przeglądanie", "Zewnętrzne", "Playlisty", "Inne"] as const;
+export const TRAFFIC_GROUPS = ["Shorts", "Sugerowane", "Wyszukiwarka", "Przeglądanie", "Zewnętrzne", "Playlisty", "Inne"] as const;
 export type TrafficGroup = (typeof TRAFFIC_GROUPS)[number];
 
 const GROUP_OF: Record<string, TrafficGroup> = {
+  SHORTS: "Shorts",
   RELATED_VIDEO: "Sugerowane",
   YT_SEARCH: "Wyszukiwarka",
   SUBSCRIBER: "Przeglądanie",
@@ -178,7 +179,7 @@ const GROUP_OF: Record<string, TrafficGroup> = {
   PLAYLIST: "Playlisty",
 };
 
-/** Sums the source types into the six display groups; shares are of total views (0 when there are none) */
+/** Sums the source types into the display groups; shares are of total views (0 when there are none) */
 export function groupTraffic(rows: { source_type: string; views: number }[]): { group: TrafficGroup; views: number; share: number }[] {
   const sum = new Map<TrafficGroup, number>(TRAFFIC_GROUPS.map((g) => [g, 0]));
   for (const r of rows) {

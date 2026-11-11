@@ -4,7 +4,7 @@ import { expect, type Page, test } from "@playwright/test";
 const email = process.env.E2E_EMAIL;
 const password = process.env.E2E_PASSWORD;
 
-test("password login opens the home page; the Dziś tile renders the dashboard at 390 px", async ({ page }) => {
+test("password login opens the home page; the Przegląd tile renders the channel overview at 390 px", async ({ page }) => {
   test.skip(!email || !password, "set E2E_EMAIL and E2E_PASSWORD");
   await page.goto("/");
   await page.getByLabel("E-mail").fill(email!);
@@ -12,12 +12,12 @@ test("password login opens the home page; the Dziś tile renders the dashboard a
   await page.getByRole("button", { name: "Zaloguj", exact: true }).click();
 
   await expect(page.getByRole("heading", { level: 1, name: "Asystent" })).toBeVisible();
-  await page.getByRole("link", { name: /^Dziś/ }).click();
+  await page.getByRole("link", { name: /^Przegląd/ }).click();
   await expect(page).toHaveURL(/\/dashboard$/);
-  await expect(page.getByRole("heading", { level: 1, name: "Side Hustle Assistant" })).toBeVisible();
-  await expect(page.getByRole("heading", { level: 2, name: "Dziś" })).toBeVisible();
-  await expect(page.getByLabel("Alerty")).toBeVisible();
-  await expect(page.getByLabel("Bramki")).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Kanały" })).toBeVisible();
+  await expect(page.getByRole("tab", { name: /^Przegląd/ })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByLabel("Wnioski")).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Główne" })).toBeVisible();
 });
 
 const supEmail = process.env.E2E_SUPPLIES_EMAIL;
@@ -41,7 +41,7 @@ test("roles protect routes; supplies check syncs between two accounts", async ({
     await login(sup, supEmail!, supPassword!);
     await expect(sup.getByRole("heading", { level: 1, name: "Asystent" })).toBeVisible();
     await expect(sup.getByRole("link", { name: "Zapasy", exact: true })).toBeVisible();
-    await expect(sup.getByRole("link", { name: "Dashboard" })).toHaveCount(0);
+    await expect(sup.getByRole("link", { name: "Kanały", exact: true })).toHaveCount(0);
     await expect(sup.getByRole("link", { name: "Użytkownicy", exact: true })).toHaveCount(0);
     await expect(sup.getByRole("link", { name: /^Pipeline/ })).toHaveCount(0);
     await sup.goto("/dashboard");

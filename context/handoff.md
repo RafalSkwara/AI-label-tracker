@@ -26,6 +26,12 @@ Rafał wants the app to grow into a personal assistant (later possibly with AI v
 
 - Barcodes (2026-11-10): scanner in `/zakupy` (native BarcodeDetector, zxing-wasm ponyfill otherwise; `public/zxing_reader.wasm` is a copy from `node_modules/zxing-wasm/dist/reader/`, update it with the package). Lookup `GET /api/products/[code]`: caller's own items → `product_cache` → Open Food Facts → Open Beauty Facts → Open Products Facts (15 reads/min/IP, User-Agent with the channel e-mail, approved by Rafał). Misses are cached 7 days; 429/5xx are not cached. ODbL attribution is shown under the shopping list and on /privacy.
 
+## UI: Kokpit (2026-11-11)
+
+- Gamification removed (levels, XP, badges, streak, `v_xp_events` no longer read; the view stays in the DB).
+- Dark-only "Kokpit" theme: tokens in `src/app/globals.css`. Bottom tab bar (`src/shell/AppNav.tsx`, `sections.ts`): Start, Kanały, Zakupy, Zapasy (by role) + "Więcej" sheet (admin, password, privacy, sign out).
+- Dashboard "Przegląd" tab (`src/components/Overview.tsx`) per YT channel: alerts, rule-based conclusions (`src/lib/channel.ts` `insights`), 6 metric panels with sparklines (last 8 weeks), 24 h, cost, traffic sources (Shorts is its own group now), search terms, top videos (42 days), gates, publish plan + automation runs, YPP progress.
+
 ## Next step
 
 ```
