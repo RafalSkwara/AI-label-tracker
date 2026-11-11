@@ -61,17 +61,15 @@ const plexMono = localFont({
 export const metadata: Metadata = {
   title: "Side Hustle Assistant",
   description: "Asystent projektów side hustle: alerty, YouTube, zadania, KPI i koszty",
-  appleWebApp: { capable: true, title: "Side Hustle", statusBarStyle: "default" },
+  appleWebApp: { capable: true, title: "Side Hustle", statusBarStyle: "black-translucent" },
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f2f5f3" },
-    { media: "(prefers-color-scheme: dark)", color: "#0e1412" },
-  ],
+  colorScheme: "dark",
+  themeColor: "#0d1117",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

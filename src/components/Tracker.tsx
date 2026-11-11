@@ -3,16 +3,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { archiveRow, loadAll, saveRow, saveSettings, setTaskDone } from "@/lib/data";
 import { daysTo, dfmt, dmy, inDays, localDateTime, nf, num, pln, today } from "@/lib/format";
-import { XP_PER_LEVEL, badges, costTotals, levelName, levelOf, monthly, streak, totalHours, totalSubs, trend, weeksAgg, xpTotal } from "@/lib/game";
+import { costTotals, monthly, weeksAgg } from "@/lib/money";
 import type { Coll, Data, Item, Settings, Sub, Task, Week } from "@/lib/types";
 import { type Alert, alerts, awaitingApproval } from "@/lib/rules";
 import RoyaltiesPanel from "./RoyaltiesPanel";
 import Sheet from "./Sheet";
-import Today from "./Today";
+import Overview from "./Overview";
 import WeeksChart from "./WeeksChart";
 
 const TABS = [
-  { id: "dzis", name: "Dziś", coll: null },
+  { id: "dzis", name: "Przegląd", coll: null },
   { id: "zadania", name: "Zadania", coll: "tasks" },
   { id: "pipeline", name: "Pipeline", coll: "items" },
   { id: "tygodnie", name: "Tygodnie", coll: "weeks" },
@@ -33,34 +33,32 @@ export default function Tracker({ email }: { email: string }) {
   const [tab, setTab] = useState<TabId>(() => {
     const ok = (s: string | null) => TABS.some((t) => t.id === s);
     try {
-      const u = new URL(window.location.href), q = u.searchParams.get("tab");
-      if (q != null) { u.searchParams.delete("tab"); history.replaceState(null, "", u.pathname + u.search + u.hash); } // keep other params, e.g. yt
+      const q = new URL(window.location.href).searchParams.get("tab");
       if (ok(q)) return q as TabId;
     } catch {}
     try { const s = sessionStorage.getItem("tab"); if (ok(s)) return s as TabId; } catch {}
     return "dzis";
   });
+  // Drop ?tab= after reading it (outside render: replaceState during render updates the router mid-render); keep other params, e.g. yt
+  useEffect(() => {
+    const u = new URL(window.location.href);
+    if (u.searchParams.has("tab")) { u.searchParams.delete("tab"); history.replaceState(null, "", u.pathname + u.search + u.hash); }
+  }, []);
   const [editing, setEditing] = useState<Editing>(null);
-  const [toast, setToast] = useState<{ msg: string; xp?: boolean } | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
   const loadedAt = useRef(0);
-  const prevXp = useRef<number | null>(null);
 
-  const flash = useCallback((msg: string, xp?: boolean) => {
-    setToast({ msg, xp });
+  const flash = useCallback((msg: string) => {
+    setToast(msg);
     setTimeout(() => setToast(null), 2800);
   }, []);
 
   const apply = useCallback((d: Data) => {
-    const after = xpTotal(d), before = prevXp.current;
-    if (before != null && after > before) {
-      flash(levelOf(after) > levelOf(before) ? `Poziom ${levelOf(after) + 1}: ${levelName(levelOf(after))}!` : `+${after - before} XP`, true);
-    }
-    prevXp.current = after;
     loadedAt.current = Date.now();
     setData(d);
     setError("");
     setBusy(false);
-  }, [flash]);
+  }, []);
   const fail = useCallback((e: unknown) => { setError((e as Error).message); setBusy(false); }, []);
 
   const load = useCallback(async () => {
@@ -107,14 +105,11 @@ export default function Tracker({ email }: { email: string }) {
 
   const alertList = useMemo(() => (data ? alerts(data, today()) : []), [data]);
 
-  const xp = data ? xpTotal(data) : 0, lvl = levelOf(xp), into = xp - lvl * XP_PER_LEVEL;
-
   return (
     <div className="wrap">
       <header className="top">
         <div>
-          <h1>Side Hustle Assistant</h1>
-          <p className="sub">{data?.projects.filter((p) => p.status === "aktywny").map((p) => p.name).join(" · ") || "Projekty"}</p>
+          <h1>Kanały</h1>
         </div>
         <div className="conn">
           <span className={"dot " + (error ? "off" : busy ? "busy" : "on")} />
@@ -132,40 +127,6 @@ export default function Tracker({ email }: { email: string }) {
 
       {data && (
         <>
-          <section className="progress" aria-label="Postęp">
-            <div>
-              <div className="lvl">
-                <span className="badge num">{lvl + 1}</span>
-                <div style={{ minWidth: 0, flex: 1 }}>
-                  <div className="name">{levelName(lvl)}</div>
-                  <div className="sub num">{nf().format(xp)} XP · {XP_PER_LEVEL - into} do poziomu {lvl + 2}</div>
-                </div>
-              </div>
-              <div className="xpbar" role="progressbar" aria-label="Postęp do następnego poziomu" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round((into / XP_PER_LEVEL) * 100)}>
-                <i style={{ width: (into / XP_PER_LEVEL) * 100 + "%" }} />
-              </div>
-              <div className="facts">
-                <div><div className="label">Seria tygodni z filmem</div><div className="v">{streak(data)}</div></div>
-                <div><div className="label">Do YPP (godziny)</div><div className="v">{nf().format(Math.max(0, 4000 - totalHours(data)))}</div></div>
-                <div><div className="label">Odznaki</div><div className="v">{badges(data).filter((b) => b.on).length}/{badges(data).length}</div></div>
-              </div>
-              <div className="badges">
-                {badges(data).map((b) => <span key={b.n} className={"bd" + (b.on ? " on" : "")} title={b.hint}>{(b.on ? "★ " : "") + b.n}</span>)}
-              </div>
-            </div>
-            <div>
-              <span className="label">Ostatnie XP</span>
-              <div className="feed">
-                {data.xp.length ? data.xp.slice(0, 6).map((e) => (
-                  <div key={e.kind + e.ref}><span>{e.title}</span><span className="xp">+{e.xp}</span></div>
-                )) : <div><span>Odhacz pierwsze zadanie, żeby zdobyć XP.</span></div>}
-              </div>
-              <p className="sub" style={{ fontSize: ".8rem", margin: 0 }}>Zadanie +10 · film +50 · EP +40 · short +15 · wpisany tydzień +5</p>
-            </div>
-          </section>
-
-          <Strip data={data} />
-
           <nav className="tabs" role="tablist">
             {TABS.map((t) => (
               <button key={t.id} role="tab" id={"tab-" + t.id} aria-selected={tab === t.id} onClick={() => pickTab(t.id)}>
@@ -176,7 +137,7 @@ export default function Tracker({ email }: { email: string }) {
           </nav>
 
           <main className="panel" role="tabpanel" aria-labelledby={"tab-" + tab}>
-            {tab === "dzis" && <Today data={data} today={today()} list={alertList} onOpen={openAlert} onReload={load} flash={flash} />}
+            {tab === "dzis" && <Overview data={data} today={today()} list={alertList} onOpen={openAlert} onReload={load} flash={flash} />}
             {tab === "zadania" && <TasksPanel data={data} onAdd={() => setEditing({ coll: "tasks", rec: null })} onEdit={(t) => setEditing({ coll: "tasks", rec: t })}
               onToggle={(t, done) => {
                 setData({ ...data, tasks: data.tasks.map((x) => (x.id === t.id ? { ...x, done } : x)) });
@@ -201,30 +162,11 @@ export default function Tracker({ email }: { email: string }) {
           onDelete={() => { const e = editing; setEditing(null); if (e.rec) run(() => archiveRow(e.coll, e.rec!), "Usunięto"); }} />
       )}
 
-      {toast && <div className={"toast" + (toast.xp ? " xp" : "")} role="status">{toast.msg}</div>}
+      {toast && <div className="toast" role="status">{toast}</div>}
     </div>
   );
 }
 
-function Meter({ ratio }: { ratio: number }) {
-  const r = Math.max(0, ratio);
-  return <div className={"meter" + (r > 1 ? " over" : "")}><i style={{ width: Math.min(100, r * 100) + "%" }} /></div>;
-}
-
-function Strip({ data }: { data: Data }) {
-  const c = costTotals(data), st = data.settings, hours = totalHours(data), subs = totalSubs(data), t = trend(data.weeks), agg = weeksAgg(data.weeks);
-  return (
-    <section className="strip" aria-label="Podsumowanie">
-      <div className="stat"><span className="label">Koszt / mies.</span><span className="v">{pln(c.total)}</span><Meter ratio={st.budget_max ? c.total / st.budget_max : 0} />
-        <span className="d">budżet {nf().format(st.budget_min)}–{nf().format(st.budget_max)} zł · aktywne {pln(c.active)}</span></div>
-      <div className="stat"><span className="label">Godziny oglądania</span><span className="v">{nf(1).format(hours)}</span><Meter ratio={hours / 4000} /><span className="d">próg YPP 4 000 h</span></div>
-      <div className="stat"><span className="label">Trend t/t (godziny)</span>
-        <span className={"v " + (t?.dir ?? "")}>{!t ? "—" : t.pct == null ? "↑ nowe" : (t.pct > 0 ? "↑ +" : t.pct < 0 ? "↓ " : "→ ") + nf(0).format(t.pct) + "%"}</span>
-        <span className="d">{t ? "tydzień od " + dfmt(agg[agg.length - 1].week_start) : "potrzeba 2 tygodni danych"}</span></div>
-      <div className="stat"><span className="label">Subskrybenci</span><span className="v">{nf().format(subs)}</span><Meter ratio={subs / 1000} /><span className="d">próg YPP 1 000</span></div>
-    </section>
-  );
-}
 
 function Head({ title, sub, noun, onAdd }: { title: string; sub: string; noun: string; onAdd: () => void }) {
   return (
@@ -241,7 +183,7 @@ function TasksPanel({ data, onAdd, onEdit, onToggle }: { data: Data; onAdd: () =
   const pname = (id: string | null) => data.projects.find((p) => p.id === id)?.name;
   return (
     <>
-      <Head title="Zadania" sub="Każde odhaczone zadanie to +10 XP" noun={NOUN.tasks} onAdd={onAdd} />
+      <Head title="Zadania" sub="Lista zadań i terminy" noun={NOUN.tasks} onAdd={onAdd} />
       {!data.tasks.length && <Empty title="Brak zadań" body="Dodaj pierwsze zadanie przyciskiem powyżej." />}
       {(["F0", "F1", "F2", "F3"] as const).map((ph) => {
         const list = data.tasks.filter((t) => t.phase === ph).sort((a, b) =>
@@ -269,7 +211,7 @@ function PipelinePanel({ data, onAdd, onEdit }: { data: Data; onAdd: () => void;
   const chan = (id: string | null) => data.projects.find((c) => c.id === id)?.name;
   return (
     <>
-      <Head title="Pipeline" sub="Film live to +50 XP, short +15, EP +40" noun={NOUN.items} onAdd={onAdd} />
+      <Head title="Pipeline" sub="Filmy, EP-ki i shorty" noun={NOUN.items} onAdd={onAdd} />
       <Automation data={data} />
       {!data.items.length ? <Empty title="Pipeline jest pusty" body="Dodaj pierwszy film, np. jesienną scenę na weekend." /> : (
         <div className="board">
@@ -332,7 +274,7 @@ function WeeksPanel({ data, onAdd, onEdit }: { data: Data; onAdd: () => void; on
   const f = (v: number | null, d: number, suffix = "") => (num(v) == null ? "—" : nf(d).format(Number(v)) + suffix);
   return (
     <>
-      <Head title="Tygodnie" sub="Dane z YouTube Studio co poniedziałek, +5 XP za wpis. W F2 uzupełni je automat." noun={NOUN.weeks} onAdd={onAdd} />
+      <Head title="Tygodnie" sub="Dane z YouTube, synchronizowane codziennie" noun={NOUN.weeks} onAdd={onAdd} />
       {!w.length ? <Empty title="Brak danych tygodniowych" body="Po pierwszym tygodniu od publikacji wpisz godziny oglądania, wyświetlenia, CTR i średni czas oglądania." /> : (
         <>
           <div className="chartbox"><span className="label">Godziny oglądania / tydzień</span><WeeksChart weeks={weeksAgg(data.weeks)} /></div>

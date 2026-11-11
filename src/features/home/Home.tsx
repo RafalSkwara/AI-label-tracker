@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Icon from "@/shell/Icon";
 import type { AppRole } from "@/shell/useRoles";
 import { TILE_GROUPS } from "./tiles";
 import s from "./home.module.css";
@@ -19,7 +20,7 @@ export default function Home({ can }: { can: (role: AppRole) => boolean }) {
           <div className={s.grid}>
             {g.tiles.map((t) => (
               <Link key={t.href} href={t.href} className={s.tile}>
-                <span className={s.icon} aria-hidden="true">{t.icon}</span>
+                <span className={s.icon}><Icon name={t.icon} /></span>
                 <span className={s.title}>{t.title}</span>
                 <span className={s.desc}>{t.desc}</span>
               </Link>

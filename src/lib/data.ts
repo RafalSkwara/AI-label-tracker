@@ -10,7 +10,7 @@ function check<T>(r: { data: T | null; error: { message: string } | null }): T {
 }
 
 export async function loadAll(db: SupabaseClient = supabase()): Promise<Data> {
-  const [tasks, items, weeks, subs, projects, gates, videos, integrations, traffic, terms, views24, settings, xp, runs] = await Promise.all([
+  const [tasks, items, weeks, subs, projects, gates, videos, integrations, traffic, terms, views24, settings, runs] = await Promise.all([
     db.from("tasks").select("*").is("archived_at", null).order("created_at"),
     db.from("content_items").select("*").is("archived_at", null),
     db.from("weekly_stats").select("*").is("archived_at", null),
@@ -23,7 +23,6 @@ export async function loadAll(db: SupabaseClient = supabase()): Promise<Data> {
     db.from("video_search_terms").select("*").order("views", { ascending: false }),
     db.from("v_views_24h").select("*"),
     db.from("settings").select("budget_min,budget_max,usd_pln,vat_pct").maybeSingle(),
-    db.from("v_xp_events").select("*").order("at", { ascending: false }),
     db.from("pipeline_runs").select("*").order("started_at", { ascending: false }).limit(40),
   ]);
   return {
@@ -39,7 +38,6 @@ export async function loadAll(db: SupabaseClient = supabase()): Promise<Data> {
     terms: check(terms),
     views24: check(views24),
     settings: check(settings) ?? { budget_min: 200, budget_max: 500, usd_pln: 3.7, vat_pct: 23 },
-    xp: check(xp),
     // Optional: an unapplied pipeline_runs migration must not break the whole app
     runs: runs.error ? [] : (runs.data ?? []),
   };
@@ -62,7 +60,7 @@ export async function saveRow(coll: Coll, prev: Row | null, out: Row) {
   else check(await db.from(TABLE[coll]).insert(out));
 }
 
-/** "Usuń" archives: the row stays in the database, hidden from the app and XP */
+/** "Usuń" archives: the row stays in the database, hidden from the app */
 export async function archiveRow(coll: Coll, row: Row) {
   const db = supabase();
   const q = db.from(TABLE[coll]).update({ archived_at: new Date().toISOString() });

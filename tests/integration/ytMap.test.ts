@@ -50,13 +50,13 @@ describe("YouTube mapping", () => {
     expect(toWeeks(mapReach(reach))).toEqual([]);
   });
 
-  it("maps traffic sources by header name and groups them into the six display groups", () => {
+  it("maps traffic sources by header name and groups them into the display groups", () => {
     const rows = mapTraffic(fixture("yt-traffic"));
     expect(rows[0]).toEqual({ source_type: "RELATED_VIDEO", views: 120, watch_minutes: 400 });
     expect(rows).toHaveLength(8);
     const g = Object.fromEntries(groupTraffic(rows).map((x) => [x.group, x.views]));
-    // external = EXT_URL + NO_LINK_OTHER; "Inne" = YT_CHANNEL + SHORTS
-    expect(g).toEqual({ Sugerowane: 120, Wyszukiwarka: 60, Przeglądanie: 30, Zewnętrzne: 10, Playlisty: 10, Inne: 10 });
+    // external = EXT_URL + NO_LINK_OTHER; "Inne" = YT_CHANNEL
+    expect(g).toEqual({ Shorts: 4, Sugerowane: 120, Wyszukiwarka: 60, Przeglądanie: 30, Zewnętrzne: 10, Playlisty: 10, Inne: 6 });
     expect(groupTraffic(rows).reduce((a, x) => a + x.share, 0)).toBeCloseTo(1);
     expect(groupTraffic([]).every((x) => x.share === 0)).toBe(true);
   });
