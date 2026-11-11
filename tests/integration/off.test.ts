@@ -12,6 +12,13 @@ describe("Open Food Facts mapping", () => {
     expect(displayName({ name: "Mlekovita mleko", brand: "Mlekovita" })).toBe("Mlekovita mleko");
   });
 
+  it("falls back to English, then to the main-language name, when there is no Polish name", () => {
+    const base = { status: 1, product: { code: "5053990106981", brands: "Pringles", product_name: "Pringles Cașcaval" } };
+    expect(mapProduct(base, "off")!.name).toBe("Pringles Cașcaval");
+    expect(mapProduct({ ...base, product: { ...base.product, product_name_en: "Pringles Cheese" } }, "off")!.name).toBe("Pringles Cheese");
+    expect(mapProduct({ ...base, product: { ...base.product, product_name_en: "Pringles Cheese", generic_name_pl: "Chipsy serowe" } }, "off")!.name).toBe("Chipsy serowe");
+  });
+
   it("returns null for unknown products and products without a name", () => {
     expect(mapProduct(fixture("off-missing"), "off")).toBeNull();
     expect(mapProduct({ status: 1, product: { brands: "X" } }, "obf")).toBeNull();
