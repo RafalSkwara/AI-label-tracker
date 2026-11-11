@@ -1,5 +1,6 @@
 import { buildPushPayload, type VapidKeys } from "@block65/webcrypto-web-push";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { addDays, type CalEvent, hm, localToday, occurrences, reminderAt, shortDay } from "@/lib/calendar";
 import { dueRenewals, renewalMessage, warsawToday } from "@/lib/reminders";
 import { secret } from "./env";
 
@@ -50,6 +51,31 @@ export async function sendRenewalReminders(db: SupabaseClient, now = new Date())
     if (!due.length) continue;
     const msg = renewalMessage(due);
     out.push({ userId, due: due.length, ...(await sendToUsers(db, [userId], { ...msg, url: "/dashboard?tab=koszty", tag: `renew-${today}` })) });
+  }
+  return out;
+}
+
+/** Every 10 min: calendar reminders due in the last 30 min that were not sent yet, to the owner and everyone the calendar is shared with */
+export async function sendCalendarReminders(db: SupabaseClient, now = Date.now()) {
+  const { data, error } = await db.from("calendar_events")
+    .select("id,calendar_id,title,starts_on,start_time,end_time,repeat,repeat_until,remind_minutes,calendars!inner(name,archived_at)")
+    .is("archived_at", null).not("remind_minutes", "is", null).is("calendars.archived_at", null);
+  if (error) throw new Error(error.message);
+  const today = localToday(new Date(now));
+  const out: { event: string; on: string; sent: number }[] = [];
+  for (const ev of (data ?? []) as unknown as (CalEvent & { calendars: { name: string } })[]) {
+    // a reminder fires at most 14 days before, so occurrences from yesterday to 15 days ahead cover every due one
+    for (const on of occurrences(ev, addDays(today, -1), addDays(today, 15))) {
+      const at = reminderAt(ev, on);
+      if (at == null || at > now || at <= now - 30 * 6e4) continue;
+      const { error: dup } = await db.from("calendar_reminders_sent").insert({ event_id: ev.id, occurs_on: on });
+      if (dup) continue; // already sent (primary key), or the table is missing
+      const { data: rec } = await db.rpc("calendar_recipients", { c: ev.calendar_id });
+      const ids = ((rec ?? []) as { user_id: string }[]).map((r) => r.user_id);
+      const when = `${on === today ? "dziś" : shortDay(on)}${ev.start_time ? `, ${hm(ev.start_time)}` : ""}`;
+      const r = await sendToUsers(db, ids, { title: ev.title, body: `${when} · ${ev.calendars.name}`, url: `/kalendarz?dzien=${on}`, tag: `cal-${ev.id}-${on}` });
+      out.push({ event: ev.id, on, sent: r.sent });
+    }
   }
   return out;
 }

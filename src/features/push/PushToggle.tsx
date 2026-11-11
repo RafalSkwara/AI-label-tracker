@@ -9,8 +9,8 @@ const NOTE: Record<Exclude<PushState, "on" | "off">, string> = {
   denied: "Powiadomienia są zablokowane w ustawieniach przeglądarki dla tej strony.",
 };
 
-/** Per-device switch for subscription renewal reminders (3 days before, the day before, on the day; ~8:00) */
-export default function PushToggle({ flash }: { flash: (msg: string) => void }) {
+/** Per-device push switch (one subscription per device serves every kind of reminder); title/desc describe what the page reminds about */
+export default function PushToggle({ flash, title = "Przypomnienia o płatnościach", on = "Włączone na tym urządzeniu: 3 dni przed, dzień przed i w dniu płatności, ok. 8:00.", off = "Powiadomienie push przed odnowieniem aktywnej subskrypcji." }: { flash: (msg: string) => void; title?: string; on?: string; off?: string }) {
   const [state, setState] = useState<PushState | null>(null);
   const [busy, setBusy] = useState(false);
   useEffect(() => { pushState().then(setState, () => setState("unsupported")); }, []);
@@ -26,8 +26,8 @@ export default function PushToggle({ flash }: { flash: (msg: string) => void }) 
   return (
     <div className="panel pushbox">
       <div>
-        <strong>Przypomnienia o płatnościach</strong>
-        <p className="sub">{state === "on" ? "Włączone na tym urządzeniu: 3 dni przed, dzień przed i w dniu płatności, ok. 8:00." : state === "off" ? "Powiadomienie push przed odnowieniem aktywnej subskrypcji." : NOTE[state]}</p>
+        <strong>{title}</strong>
+        <p className="sub">{state === "on" ? on : state === "off" ? off : NOTE[state]}</p>
       </div>
       {(state === "on" || state === "off") && (
         <div className="row">

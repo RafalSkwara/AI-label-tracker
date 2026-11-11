@@ -16,6 +16,7 @@ const PATHS = {
   key: "M15 9a4 4 0 1 0-3.8 4L3 21v-3h3v-3h3l2.2-2.2M16.5 7.5h.01",
   logout: "M15 4h4v16h-4M10 8l-4 4 4 4M6 12h11",
   doc: "M6 3h8l4 4v14H6zM14 3v4h4M9 12h6M9 16h6",
+  calendar: "M4 6h16v14H4zM4 10h16M8 3v4M16 3v4M8 14h.01M12 14h.01M16 14h.01M8 17h.01M12 17h.01",
 } as const;
 
 export type IconName = keyof typeof PATHS;

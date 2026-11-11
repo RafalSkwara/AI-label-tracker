@@ -49,6 +49,14 @@ Rafał wants the app to grow into a personal assistant (later possibly with AI v
 - Library: `@block65/webcrypto-web-push` 2.x (WebCrypto, aes128gcm, works on workerd and Apple).
 - Secrets: `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` (generate with `node scripts/gen-vapid.mjs`), `VAPID_SUBJECT` = the app URL. iOS needs the PWA installed to the home screen.
 
+## Calendar (2026-11-11)
+
+- `/kalendarz` (`src/features/calendar/`, date math in `src/lib/calendar.ts`): month grid, the chosen day's events, "Wkrótce" (next 30 days). Every user gets "Mój kalendarz" on the first visit. Calendars are shared by e-mail like shopping lists (`calendar_shares`); only the owner renames, recolours, archives and shares.
+- Events: local Polish date/time, all-day when `start_time` is null, repeat none/weekly/monthly/yearly (+ optional end), optional push reminder (`remind_minutes`). Editing or removing a repeating event changes the whole series.
+- Dashboard users also see active subscription payments (`renew`) as read-only items.
+- Reminders: cron `*/10 * * * *` (kind `reminders`) → `sendCalendarReminders` sends reminders due in the last 30 min to the owner and every account the calendar is shared with (`calendar_recipients`, service role only); `calendar_reminders_sent` prevents duplicates. All-day events are reminded as if they started at 08:00.
+- Migration `20261111160000_calendar.sql` (rollback in `supabase/rollback/`).
+
 ## Next step
 
 ```
