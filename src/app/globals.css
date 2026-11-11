@@ -312,3 +312,8 @@ button.k-alarm{cursor:pointer}
 .k-runs a.no{background:var(--bad)} .k-runs a.run{background:var(--warn)}
 .k-runs span{margin-left:6px;overflow-wrap:anywhere}
 .k-morealerts{justify-self:start;min-height:36px}
+
+/* Two-way switch between sibling pages (Zakupy: Listy / Wydatki) */
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px;background:var(--sunk);border-radius:10px}
+.seg a{display:grid;place-items:center;min-height:40px;border-radius:8px;color:var(--muted);text-decoration:none;font-weight:500}
+.seg a[aria-current="page"]{background:var(--surface);color:var(--ink);box-shadow:0 0 0 1px var(--line)}

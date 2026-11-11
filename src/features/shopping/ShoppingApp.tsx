@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { archiveItems, archiveList, insertItem, insertList, loadHistory, loadShopping, renameList, uncheckItems, updateItem } from "./data";
 import { addShare, loadShares, removeShare, SHOPPING, type Shares, sharedLabel } from "@/features/sharing/data";
@@ -215,6 +216,10 @@ export default function ShoppingApp({ userId, email }: { userId: string; email: 
         />
       ) : (
         <>
+          <nav className="seg" aria-label="Zakupy">
+            <Link href="/zakupy" aria-current="page">Listy</Link>
+            <Link href="/wydatki">Wydatki</Link>
+          </nav>
           <h1>Listy zakupów</h1>
           {sel && !error && <p className="sub">Tej listy już nie ma.</p>}
           <form className={s.add} onSubmit={addList}>

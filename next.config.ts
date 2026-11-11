@@ -6,4 +6,6 @@ const nextConfig: NextConfig = {};
 
 export default nextConfig;
 
-initOpenNextCloudflareForDev();
+// No remote bindings in `next dev`/`next build`: Workers AI is remote-only and would need a Cloudflare login
+// (or CLOUDFLARE_API_TOKEN) just to build. Receipt reading therefore works only on the deployed Worker.
+initOpenNextCloudflareForDev({ remoteBindings: false });
