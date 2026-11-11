@@ -5,7 +5,8 @@ import openNext from "./.open-next/worker.js";
 type Env = { CRON_SECRET: string } & Record<string, unknown>;
 
 /** Must match `triggers.crons` in wrangler.jsonc; an expression not listed here runs nothing */
-const KINDS: Record<string, "daily" | "hourly"> = { "0 5 * * *": "daily", "30 * * * *": "hourly" };
+// "0 7 * * *": 8:00 in Poland in winter, 9:00 in summer
+const KINDS: Record<string, "daily" | "hourly" | "push"> = { "0 5 * * *": "daily", "30 * * * *": "hourly", "0 7 * * *": "push" };
 
 const handler = {
   fetch: (request: Request, env: Env, ctx: unknown) => openNext.fetch(request, env, ctx),

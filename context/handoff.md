@@ -41,6 +41,14 @@ Rafał wants the app to grow into a personal assistant (later possibly with AI v
   - Shares match on the e-mail in the JWT, so sharing with an address that has no account yet works once the admin creates it.
 - UI: Start shows one square tile per feature (2 columns on a phone). Koszty and Subskrypcje are one tab (`?tab=subskrypcje` redirects to Koszty). Sharing sheet: `src/features/sharing/`.
 
+## Push: subscription renewal reminders (2026-11-11)
+
+- Scope agreed with Rafał: push only for subscription renewals (calendar and receipt-based expenses come later).
+- `push_subscriptions` (migration `20261111140000_push_subscriptions.sql`): Worker-only table (RLS on, no grants). `/api/push/subscribe` (POST/DELETE), `/api/push/test`, `/api/push/key`; `public/sw.js` shows the notification and opens `url` on tap.
+- Cron `0 7 * * *` (kind `push`, 8:00 in Poland in winter) -> `sendRenewalReminders`: per user, one notification for active subscriptions whose `renew` is 3 days away, tomorrow or today (`src/lib/reminders.ts`). 404/410 or 10 failures archive a subscription.
+- Library: `@block65/webcrypto-web-push` 2.x (WebCrypto, aes128gcm, works on workerd and Apple).
+- Secrets: `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` (generate with `node scripts/gen-vapid.mjs`), `VAPID_SUBJECT` = the app URL. iOS needs the PWA installed to the home screen.
+
 ## Next step
 
 ```
