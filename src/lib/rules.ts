@@ -218,7 +218,7 @@ export function alerts(d: Data, today: string, nowMs: number = Date.now()): Aler
     }
   }
 
-  out.push(...automationAlerts(d.runs, nowMs));
+  out.push(...automationAlerts(d.runs, nowMs, d.published));
 
   return out.sort((a, b) => RANK[a.severity] - RANK[b.severity]);
 }
@@ -227,8 +227,8 @@ const HOURS_6 = 6 * 3600e3;
 const BUILD_GAP_MS = 4 * DAY; // builds run Mon + Thu, so the longest normal gap is 4 days
 
 /** Successful builds (newest first, one per slug) with no later successful approve run for the same slug */
-export function awaitingApproval(runs: PipelineRun[]): PipelineRun[] {
-  const approved = new Set(runs.filter((r) => r.workflow === "approve" && r.status === "success" && r.slug).map((r) => r.slug));
+export function awaitingApproval(runs: PipelineRun[], published: string[] = []): PipelineRun[] {
+  const approved = new Set([...runs.filter((r) => r.workflow === "approve" && r.status === "success" && r.slug).map((r) => r.slug), ...published]);
   const seen = new Set<string>();
   const out: PipelineRun[] = [];
   for (const r of runs) {
@@ -241,7 +241,7 @@ export function awaitingApproval(runs: PipelineRun[]): PipelineRun[] {
 }
 
 /** Alerts from the automated pipeline run log (`runs` is newest first) */
-export function automationAlerts(runs: PipelineRun[], nowMs: number): Alert[] {
+export function automationAlerts(runs: PipelineRun[], nowMs: number, published: string[] = []): Alert[] {
   const out: Alert[] = [];
   const projects = [...new Set(runs.map((r) => r.project_id))];
   for (const pid of projects) {
@@ -260,12 +260,12 @@ export function automationAlerts(runs: PipelineRun[], nowMs: number): Alert[] {
       if (nowMs - Date.parse(build.started_at) > BUILD_GAP_MS)
         out.push({ ...base, severity: "high", title: "Build nie wystartował", detail: `Ostatni build ${at} (ponad 4 dni temu)`, ref: "gap-" + pid });
     }
-    for (const r of awaitingApproval(own))
-      out.push({ ...base, severity: "med", title: `Czeka na /publish: ${r.slug}`, detail: `Zbudowany ${localDateTime(r.finished_at ?? r.started_at)} · zatwierdź w issue na GitHubie`, ref: "await-" + r.slug });
+    for (const r of awaitingApproval(own, published))
+      out.push({ ...base, severity: "med", title: `Czeka na publikację: ${r.slug}`, detail: `Zbudowany ${localDateTime(r.finished_at ?? r.started_at)} · opublikuj w sekcji Wideo`, ref: "await-" + r.slug });
     for (const wf of ["approve", "check"] as const) {
       const last = own.find((r) => r.workflow === wf);
       if (last && (last.status === "failure" || last.status === "cancelled"))
-        out.push({ ...base, severity: "high", title: wf === "approve" ? "Publikacja (/publish) nie powiodła się" : "Sprawdzenie połączeń nie powiodło się", detail: `${localDateTime(last.started_at)}${last.slug ? " · " + last.slug : ""}`, ref: `${last.run_id}-${last.run_attempt}` });
+        out.push({ ...base, severity: "high", title: wf === "approve" ? "Publikacja nie powiodła się" : "Sprawdzenie połączeń nie powiodło się", detail: `${localDateTime(last.started_at)}${last.slug ? " · " + last.slug : ""}`, ref: `${last.run_id}-${last.run_attempt}` });
     }
   }
   return out;

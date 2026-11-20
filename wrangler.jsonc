@@ -10,5 +10,7 @@
 	},
 	"triggers": { "crons": ["0 5 * * *", "30 * * * *", "0 7 * * *", "*/10 * * * *"] },
 	"ai": { "binding": "AI" },
+	// shared with Slowfall-pipeline; video jobs live under jobs/<id>/
+	"r2_buckets": [{ "binding": "MEDIA", "bucket_name": "slowfall" }],
 	"observability": { "enabled": true }
 }

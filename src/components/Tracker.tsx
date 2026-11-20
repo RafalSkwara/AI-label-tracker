@@ -1,10 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { archiveRow, loadAll, saveRow, saveSettings, setTaskDone } from "@/lib/data";
 import { daysTo, dfmt, dmy, inDays, localDateTime, nf, num, pln, today } from "@/lib/format";
 import { costTotals, monthly, weeksAgg } from "@/lib/money";
 import type { Coll, Data, Item, Settings, Sub, Task, Week } from "@/lib/types";
+import { manageUrl } from "@/lib/subLinks";
 import { type Alert, alerts, awaitingApproval } from "@/lib/rules";
 import PushToggle from "@/features/push/PushToggle";
 import RoyaltiesPanel from "./RoyaltiesPanel";
@@ -212,6 +214,7 @@ function PipelinePanel({ data, onAdd, onEdit }: { data: Data; onAdd: () => void;
   return (
     <>
       <Head title="Pipeline" sub="Filmy, EP-ki i shorty" noun={NOUN.items} onAdd={onAdd} />
+      <p className="banner"><span>Renderowanie, status, zatrzymanie i publikacja filmów są w sekcji Wideo.</span><Link className="btn" href="/wideo">Wideo →</Link></p>
       <Automation data={data} />
       {!data.items.length ? <Empty title="Pipeline jest pusty" body="Dodaj pierwszy film, np. jesienną scenę na weekend." /> : (
         <div className="board">
@@ -248,16 +251,16 @@ const RUN_CLS = { running: "soon", success: "ok", failure: "late", cancelled: "l
 /** Last runs of the automated pipelines (GitHub Actions), newest first */
 function Automation({ data }: { data: Data }) {
   if (!data.runs.length) return null;
-  const waiting = awaitingApproval(data.runs);
+  const waiting = awaitingApproval(data.runs, data.published);
   return (
     <section className="runs" aria-label="Automatyzacja">
-      <span className="label">Automatyzacja{waiting.length ? ` · czeka na /publish: ${waiting.length}` : ""}</span>
+      <span className="label">Automatyzacja{waiting.length ? ` · czeka na publikację: ${waiting.length}` : ""}</span>
       {data.runs.slice(0, 8).map((r) => (
         <a key={r.run_id + "-" + r.run_attempt} className="card run" href={r.run_url} target="_blank" rel="noopener">
           <span className="t">{WF[r.workflow]}{r.slug ? " · " + r.slug : ""}</span>
           <div className="meta">
             <span className={"chip " + RUN_CLS[r.status]}>{RUN_ST[r.status]}</span>
-            {waiting.some((w) => w.run_id === r.run_id) && <span className="chip soon">czeka na /publish</span>}
+            {waiting.some((w) => w.run_id === r.run_id) && <span className="chip soon">czeka na publikację</span>}
             <span className="chip">{localDateTime(r.started_at)}</span>
             {r.finished_at && <span className="chip">{Math.max(1, Math.round((Date.parse(r.finished_at) - Date.parse(r.started_at)) / 60e3))} min</span>}
           </div>
@@ -348,7 +351,7 @@ function CostsPanel({ data, onAdd, onEdit, onSettings, flash }: { data: Data; on
               </dl>
               {s.note && <p className="details">{s.note}</p>}
               {s.plan_details && <p className="details">{s.plan_details}</p>}
-              {s.dashboard_url && /^https?:\/\//.test(s.dashboard_url) && <a href={s.dashboard_url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>Otwórz dashboard</a>}
+              {manageUrl(s) && <a className="manage" href={manageUrl(s)!} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>{s.status === "anulowana" ? "Konto i płatności ↗" : "Zmień plan / anuluj ↗"}</a>}
             </div>
           ))}
         </div>

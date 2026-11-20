@@ -48,7 +48,7 @@ const FIELDS: Record<Coll, Field[]> = {
     { k: "renew", l: "Następna płatność", t: "date" },
     { k: "plan_details", l: "Szczegóły planu", t: "textarea", wide: true },
     { k: "project_id", l: "Projekt", t: "project" },
-    { k: "dashboard_url", l: "Link do dashboardu", t: "url", wide: true },
+    { k: "dashboard_url", l: "Link do zarządzania (zmiana planu, anulowanie)", t: "url", wide: true },
     { k: "note", l: "Notatka", t: "textarea", wide: true },
   ],
 };
