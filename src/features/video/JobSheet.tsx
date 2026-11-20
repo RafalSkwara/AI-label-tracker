@@ -5,7 +5,7 @@ import {
   ACTIVE, type Asset, blocked, checksOf, cleanStyle, FONTS, gb, KIND_LABEL, LAYOUTS, type Meta, mmss, type Params, parseMmss,
   presetStyle, PRESETS, type Privacy, STATUS, type Style, type VideoJob,
 } from "@/lib/video";
-import { action, applyInstructions, download, saveJob, shortsFor, upload } from "./data";
+import { action, applyInstructions, download, saveJob, shortFrom, shortsFor, upload } from "./data";
 import s from "./video.module.css";
 
 type Props = {
@@ -192,8 +192,11 @@ export default function JobSheet({ job, onChange, onRemoved, onOpen, onClose, fl
               <button className="btn primary" disabled={!!busy || missing.length > 0} onClick={() => act("Start", "render")}>
                 {cmv ? (files.length ? "Renderuj ponownie" : "Renderuj") : job.kind === "sf_shorts" ? "Zbuduj Shorty" : "Zbuduj film + 3 Shorty"}
               </button>
-              {cmv && <span className="sub">{job.kind === "short" ? "~5 min" : "16:9 w 4K: ~30 min"} na GitHub Actions</span>}
+              {cmv && <span className="sub">{job.kind === "short" ? "~5 min" : "16:9 w 4K: ~50 min"} na GitHub Actions</span>}
             </div>
+          )}
+          {cmv && job.kind !== "short" && !active && (
+            <button className="btn" disabled={!!busy || missing.length > 0} onClick={async () => { const j = await run("Short", () => shortFrom(job.id)); if (j) onOpen(j); }}>Short 9:16 z tej piosenki (wybrany fragment)…</button>
           )}
           {!cmv && job.kind === "sf_long" && !active && (
             <button className="btn" disabled={!!busy || missing.length > 0} onClick={async () => { const j = await run("Shorty", () => shortsFor(job)); if (j) onOpen(j); }}>Tylko Shorty z tej sceny…</button>
@@ -314,7 +317,7 @@ function Segment({ params, setP }: { params: Params; setP: (p: Partial<Params>) 
     <div className={s.two}>
       <label className="field">Od (m:ss)<input inputMode="decimal" placeholder="auto" value={a} onChange={(e) => setA(e.target.value)} onBlur={() => commit(a, b)} /></label>
       <label className="field">Do (m:ss)<input inputMode="decimal" placeholder="auto" value={b} onChange={(e) => setB(e.target.value)} onBlur={() => commit(a, b)} /></label>
-      <p className="sub" style={{ gridColumn: "1/-1", margin: 0 }}>Puste = pierwszy refren (do 45 s).</p>
+      <p className="sub" style={{ gridColumn: "1/-1", margin: 0 }}>Puste = pierwszy refren (do 60 s). Format: 1:05 albo 65.</p>
     </div>
   );
 }
