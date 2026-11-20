@@ -28,7 +28,14 @@ export async function POST(req: Request) {
   if (!b) return Response.json({ error: "R2 unavailable" }, { status: 503 });
 
   const key = `jobs/${id}/in/${crypto.randomUUID().slice(0, 8)}-${name.replace(/\s+/g, "-")}`;
-  await b.put(key, req.body, { httpMetadata: { contentType: req.headers.get("content-type") ?? "application/octet-stream" } });
+  try {
+    // R2 needs a stream of known length; the body Next.js hands over has none, so pin it to content-length
+    const FLS = (globalThis as unknown as { FixedLengthStream?: new (n: number) => TransformStream<Uint8Array, Uint8Array> }).FixedLengthStream;
+    const body = FLS ? req.body.pipeThrough(new FLS(size)) : await req.arrayBuffer();
+    await b.put(key, body, { httpMetadata: { contentType: req.headers.get("content-type") ?? "application/octet-stream" } });
+  } catch (e) {
+    return Response.json({ error: `zapis do R2: ${(e as Error).message}` }, { status: 500 });
+  }
   // one song / background / timing per job: a new upload replaces the old one
   const single = role !== "clip";
   const replaced = single ? job.assets.filter((a) => a.role === role) : [];
