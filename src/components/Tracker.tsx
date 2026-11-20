@@ -5,6 +5,7 @@ import { archiveRow, loadAll, saveRow, saveSettings, setTaskDone } from "@/lib/d
 import { daysTo, dfmt, dmy, inDays, localDateTime, nf, num, pln, today } from "@/lib/format";
 import { costTotals, monthly, weeksAgg } from "@/lib/money";
 import type { Coll, Data, Item, Settings, Sub, Task, Week } from "@/lib/types";
+import { manageUrl } from "@/lib/subLinks";
 import { type Alert, alerts, awaitingApproval } from "@/lib/rules";
 import PushToggle from "@/features/push/PushToggle";
 import RoyaltiesPanel from "./RoyaltiesPanel";
@@ -348,7 +349,7 @@ function CostsPanel({ data, onAdd, onEdit, onSettings, flash }: { data: Data; on
               </dl>
               {s.note && <p className="details">{s.note}</p>}
               {s.plan_details && <p className="details">{s.plan_details}</p>}
-              {s.dashboard_url && /^https?:\/\//.test(s.dashboard_url) && <a href={s.dashboard_url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>Otwórz dashboard</a>}
+              {manageUrl(s) && <a className="manage" href={manageUrl(s)!} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>{s.status === "anulowana" ? "Konto i płatności ↗" : "Zmień plan / anuluj ↗"}</a>}
             </div>
           ))}
         </div>
