@@ -40,3 +40,4 @@
 .outs a{color:var(--accent)}
 .box :global(input[type="range"]){padding:0;accent-color:var(--accent)}
 .box :global(input[type="color"]){padding:2px;height:40px}
+.bgprev{width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:8px;border:1px solid var(--line)}

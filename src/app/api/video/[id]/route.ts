@@ -1,9 +1,10 @@
 import { ownerDb, signLink } from "@/lib/server/auth";
 import { cancelRun, dispatch } from "@/lib/server/github";
+import { generateBackground } from "@/lib/server/background";
 import { media, removePrefix } from "@/lib/server/media";
 import { ACTIVE, blocked, type Meta, type Output, type VideoJob } from "@/lib/video";
 
-type Body = { action?: string; meta?: Meta; key?: string; keys?: string[] };
+type Body = { action?: string; meta?: Meta; key?: string; keys?: string[]; prompt?: string };
 const err = (error: string, status = 400) => Response.json({ error }, { status });
 
 function cleanMeta(m: Meta | undefined, current: Meta): Meta {
@@ -42,6 +43,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         if (active) return err("już trwa");
         const missing = blocked(job);
         if (missing.length) return err(`brakuje: ${missing.map((m) => m.label).join(", ")}`);
+        // optional background prompt: make the image now if none was uploaded or generated yet
+        const bgPrompt = job.params.bg_prompt?.trim();
+        if (job.brand === "cmv" && job.kind !== "music_video" && bgPrompt && !job.assets.some((a) => a.role === "background")) {
+          try { await generateBackground(c.db, job, bgPrompt); } catch (e) { return err(`tło: ${(e as Error).message}`, 502); }
+        }
         const prev = { status: job.status, stage: job.stage };
         await update({ status: "queued", stage: "Czeka na maszynę GitHub", progress: 0, error: null, run_id: null, run_url: null });
         try {
@@ -67,6 +73,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           return err(`nie udało się uruchomić: ${(e as Error).message}`, 502);
         }
         return Response.json(await fresh());
+      }
+      case "background": {
+        const prompt = (body.prompt ?? job.params.bg_prompt ?? "").trim();
+        if (job.brand !== "cmv" || !prompt) return err("brak promptu tła");
+        if (active) return err("już trwa");
+        await update({ params: { ...job.params, bg_prompt: prompt } });
+        return Response.json(await generateBackground(c.db, { ...job, params: { ...job.params, bg_prompt: prompt } }, prompt));
       }
       case "save-meta":
         return Response.json(await update({ meta: cleanMeta(body.meta, job.meta) }));

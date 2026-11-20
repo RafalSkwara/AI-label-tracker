@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ACTIVE, type Asset, blocked, checksOf, cleanStyle, FONTS, gb, KIND_LABEL, LAYOUTS, type Meta, mmss, type Params, parseMmss,
   presetStyle, PRESETS, type Privacy, STATUS, type Style, type VideoJob,
@@ -109,7 +109,21 @@ export default function JobSheet({ job, onChange, onRemoved, onOpen, onClose, fl
             <FileRow label="Piosenka (MP3/WAV)" accept="audio/*,.mp3,.wav,.m4a,.flac" role="audio" job={job} onFile={onFile} onRemove={(a) => act("Usuwanie", "remove-asset", { key: a.key })} busy={!!busy} />
             {job.kind === "music_video"
               ? <FileRow label="Klipy (MP4, kolejność = kolejność cięć)" accept="video/*" role="clip" multiple job={job} onFile={onFile} onRemove={(a) => act("Usuwanie", "remove-asset", { key: a.key })} busy={!!busy} />
-              : <FileRow label="Tło: obraz albo wideo (opcjonalnie)" accept="image/*,video/*" role="background" job={job} onFile={onFile} onRemove={(a) => act("Usuwanie", "remove-asset", { key: a.key })} busy={!!busy} />}
+              : <>
+                <FileRow label="Tło: obraz albo wideo (opcjonalnie)" accept="image/*,video/*" role="background" job={job} onFile={onFile} onRemove={(a) => act("Usuwanie", "remove-asset", { key: a.key })} busy={!!busy} />
+                <BgPreview job={job} />
+                <label className="field">Prompt tła (opcjonalnie, AI zrobi obraz)
+                  <textarea rows={2} value={params.bg_prompt ?? ""} onChange={(e) => setP({ bg_prompt: e.target.value })} placeholder="np. pusty pokój nocą, światło telefonu na suficie, deszcz za oknem" />
+                </label>
+                {params.bg_prompt?.trim() && (
+                  <div className={s.row}>
+                    <button className="btn" disabled={!!busy || active} onClick={() => act("Tło", "background", { prompt: params.bg_prompt })}>
+                      {busy === "Tło" ? "Generuję…" : job.assets.some((a) => a.role === "background") ? "Wygeneruj nowe tło" : "Wygeneruj tło"}
+                    </button>
+                    <span className="sub">albo samo powstanie przy „Renderuj”</span>
+                  </div>
+                )}
+              </>}
             {busy.startsWith("Wysyłanie") && <p className="sub">{busy}…</p>}
           </section>
         )}
@@ -248,6 +262,21 @@ export default function JobSheet({ job, onChange, onRemoved, onOpen, onClose, fl
       </div>
     </div>
   );
+}
+
+/** Thumbnail of an image background (signed link, refreshed when the background changes) */
+function BgPreview({ job }: { job: VideoJob }) {
+  const bg = job.assets.find((a) => a.role === "background" && /\.(png|jpe?g|webp)$/i.test(a.name));
+  const [src, setSrc] = useState<{ key: string; url: string } | null>(null);
+  useEffect(() => {
+    if (!bg || src?.key === bg.key) return;
+    let live = true;
+    action(job.id, "link", { key: bg.key }).then((r) => { if (live && r.url) setSrc({ key: bg.key, url: r.url }); }).catch(() => {});
+    return () => { live = false; };
+  }, [bg, job.id, src?.key]);
+  if (!bg || src?.key !== bg.key) return null;
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img className={s.bgprev} src={src.url} alt="Tło" />;
 }
 
 function FileRow({ label, accept, role, multiple, job, onFile, onRemove, busy }: {

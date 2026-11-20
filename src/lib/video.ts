@@ -25,7 +25,7 @@ export type Style = {
 };
 
 export type Params = {
-  song?: string; artist?: string; lyrics?: string; instructions?: string; preset?: string;
+  song?: string; artist?: string; lyrics?: string; instructions?: string; preset?: string; bg_prompt?: string;
   style?: Style; formats?: ("16:9" | "9:16")[]; segment?: { start: number; end: number } | null;
   show_lyrics?: boolean; matched?: number; realign?: boolean; publish_at?: string | null;
 };
@@ -109,7 +109,7 @@ export function cmvChecks(j: VideoJob): Check[] {
     { key: "lyrics", label: "Tekst piosenki", ok: has("timing") || !!j.params.lyrics?.trim(), required: true, hint: "Wklej tekst z [Verse]/[Chorus] albo wrzuć plik z timingami" },
   ];
   if (j.kind === "music_video") c.push({ key: "clips", label: "Klipy do teledysku", ok: has("clip"), required: true, hint: "Wrzuć klipy z Kling/MJ (każdy ≥ 3 s)" });
-  else c.push({ key: "bg", label: "Tło (obraz lub wideo)", ok: has("background"), required: false, hint: "Bez tła: gradient z kolorów stylu" });
+  else c.push({ key: "bg", label: "Tło (obraz lub wideo)", ok: has("background"), required: false, hint: j.params.bg_prompt?.trim() ? "Powstanie z promptu przy starcie renderu" : "Bez tła: gradient z kolorów stylu" });
   return c;
 }
 
