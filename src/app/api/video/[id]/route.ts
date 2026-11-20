@@ -2,7 +2,7 @@ import { ownerDb, signLink } from "@/lib/server/auth";
 import { cancelRun, dispatch } from "@/lib/server/github";
 import { generateBackground } from "@/lib/server/background";
 import { media, removePrefix } from "@/lib/server/media";
-import { ACTIVE, blocked, type Meta, type Output, type VideoJob } from "@/lib/video";
+import { ACTIVE, blocked, chorusSegment, type Meta, type Output, type VideoJob } from "@/lib/video";
 
 type Body = { action?: string; meta?: Meta; key?: string; keys?: string[]; prompt?: string };
 const err = (error: string, status = 400) => Response.json({ error }, { status });
@@ -110,6 +110,37 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         if (b && job.brand === "cmv") await removePrefix(b, `jobs/${id}/`);
         await update({ archived_at: new Date().toISOString(), status: active ? "cancelled" : job.status });
         return Response.json({ ok: true });
+      }
+      case "short": {
+        // a 9:16 short from this song: same files, text and look; the alignment is reused, so no second ASR pass
+        if (job.brand !== "cmv" || job.kind === "short") return err("tylko z lyric video lub teledysku");
+        const b = media();
+        if (!b) return err("R2 unavailable", 503);
+        const p = job.params;
+        const { data: short, error } = await c.db.from("video_jobs").insert({
+          brand: "cmv", kind: "short", project_id: (job as VideoJob & { project_id?: string }).project_id, title: `${p.song ?? job.title} · short`,
+          params: { song: p.song, artist: p.artist, lyrics: p.lyrics, preset: p.preset, instructions: p.instructions, style: p.style, segment: null },
+          meta: { ...job.meta, title: `${job.meta.title ?? p.song} #shorts`.slice(0, 100), publish_at: undefined },
+        }).select("*").single<VideoJob>();
+        if (error || !short) return err(error?.message ?? "insert failed", 500);
+        const assets = [];
+        for (const a of job.assets.filter((x) => x.role !== "clip")) {
+          const o = await b.get(a.key);
+          if (!o) continue;
+          const key = `jobs/${short.id}/in/${a.key.split("/").pop()}`;
+          await b.put(key, await new Response(o.body).arrayBuffer(), { httpMetadata: o.httpMetadata });
+          assets.push({ ...a, key });
+        }
+        let segment = null;
+        const t = await b.get(`jobs/${id}/work/timing.json`);
+        if (t) {
+          const text = await new Response(t.body).text();
+          await b.put(`jobs/${short.id}/work/timing.json`, text, { httpMetadata: { contentType: "application/json" } });
+          try { segment = chorusSegment(JSON.parse(text), p.style?.chorusSections); } catch {}
+        }
+        const { data, error: e2 } = await c.db.from("video_jobs").update({ assets, params: { ...short.params, segment } }).eq("id", short.id).select("*").single<VideoJob>();
+        if (e2) return err(e2.message, 500);
+        return Response.json(data);
       }
       case "link": {
         const own = [...job.outputs.map((o) => o.key), ...job.assets.map((a) => a.key)].filter(Boolean);

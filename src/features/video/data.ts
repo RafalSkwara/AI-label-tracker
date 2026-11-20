@@ -69,6 +69,9 @@ export async function upload(id: string, role: string, file: File): Promise<Vide
   return api<VideoJob>(`/api/video/upload?${q}`, { method: "POST", body: file, headers: { "content-type": file.type || "application/octet-stream" } });
 }
 
+/** New 9:16 short from a lyric video / music video: copies its files, text, style and alignment */
+export const shortFrom = (id: string) => action(id, "short") as Promise<VideoJob>;
+
 export async function download(id: string, key: string) {
   const { url } = await action(id, "link", { key });
   if (url) window.location.href = url;

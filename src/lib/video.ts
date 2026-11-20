@@ -116,6 +116,20 @@ export function cmvChecks(j: VideoJob): Check[] {
 export const checksOf = (j: VideoJob) => (j.brand === "cmv" ? cmvChecks(j) : j.checks);
 export const blocked = (j: VideoJob) => checksOf(j).filter((c) => c.required !== false && !c.ok);
 
+type Timing = { duration: number; lines: { section: string | null; start: number; end: number }[] };
+
+/** First chorus (consecutive lines of a chorus section) as a short's segment, max 60 s; same rule as cmv.py */
+export function chorusSegment(t: Timing, names: string[] = CHORUS): { start: number; end: number } | null {
+  const isChorus = (s: string | null) => !!s && names.some((n) => s.toLowerCase().startsWith(n.toLowerCase()));
+  const i = t.lines.findIndex((l) => isChorus(l.section));
+  if (i < 0) return null;
+  let j = i;
+  while (j + 1 < t.lines.length && t.lines[j + 1].section === t.lines[i].section) j++;
+  const start = Math.max(0, t.lines[i].start - 0.5);
+  const end = Math.min(t.duration, t.lines[j].end + 1, start + 60);
+  return { start: Math.round(start * 10) / 10, end: Math.round(end * 10) / 10 };
+}
+
 /** m:ss ↔ seconds for segment inputs */
 export const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, "0")}`;
 export function parseMmss(v: string): number | null {
