@@ -67,6 +67,15 @@ Rafał wants the app to grow into a personal assistant (later possibly with AI v
 - `next.config.ts` calls `initOpenNextCloudflareForDev({ remoteBindings: false })`, so `next dev`/`next build` need no Cloudflare login; receipt reading works only on the deployed Worker.
 - Migration `20261111180000_expenses.sql` (rollback in `supabase/rollback/`).
 
+## Video jobs ("Wideo", 2026-11-20)
+
+- `/wideo` (`src/features/video/`, shared types `src/lib/video.ts`), tile on Start, lights up the Kanały tab. Dashboard role.
+- `video_jobs` (migration `20261120100000_video_jobs.sql`, rollback in `supabase/rollback/`): one row per video. CMV kinds `lyric`, `short`, `music_video`; Slowfall `sf_long` (one row per scene, created by the pipeline's sync) and `sf_shorts`.
+- The app is the control panel; Slowfall-pipeline does the work on GitHub Actions: `job.yml` (render / publish one job), `sync.yml` (scene readiness + real YouTube state, every 3 h and from "Odśwież"). Runs write status/progress/outputs back with the service-role key.
+- API: `POST /api/video/upload` (file → R2 `jobs/<id>/in/`, ≤ 95 MB), `POST /api/video/[id]` (render, publish, save-meta, cancel, clean, remove-asset, archive, link), `GET /api/video/file?t=` (signed 30-min download), `POST /api/video/style` (Workers AI: instructions → style JSON), `POST /api/video/sync`.
+- Bindings/secrets: R2 bucket `slowfall` as `MEDIA` (wrangler.jsonc); `GH_PIPELINE_TOKEN` = fine-grained PAT on Slowfall-pipeline with Actions read/write. Pipeline secret `YT_CMV_REFRESH_TOKEN` for the CMV channel.
+- Removing a CMV job removes its R2 folder; a Slowfall job is only hidden (scene assets belong to the pipeline). YouTube videos are never deleted by the app.
+
 ## Next step
 
 ```

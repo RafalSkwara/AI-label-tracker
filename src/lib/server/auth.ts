@@ -15,6 +15,31 @@ async function callerDb(req: Request) {
   return error || !user.user ? null : { db, userId: user.user.id };
 }
 
+/** Caller's client when they may use the dashboard (is_owner); RLS limits every query to their own rows */
+export async function ownerDb(req: Request) {
+  const c = await callerDb(req);
+  if (!c) return null;
+  const { data: ok } = await c.db.rpc("is_owner");
+  return ok === true ? c : null;
+}
+
+/** HMAC-signed, expiring token for a link that cannot carry an Authorization header (file downloads) */
+export async function signLink(payload: string, ttlMs: number): Promise<string> {
+  const body = b64u(enc.encode(JSON.stringify({ v: payload, e: Date.now() + ttlMs })));
+  return `${body}.${await hmac(body)}`;
+}
+
+export async function verifyLink(token: string): Promise<string | null> {
+  const [body, sig] = token.split(".");
+  if (!body || !sig || !safeEqual(sig, await hmac(body))) return null;
+  try {
+    const { v, e } = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(body.replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0))));
+    return typeof v === "string" && typeof e === "number" && e > Date.now() ? v : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Dashboard user's own project ids (RLS: owner_id = caller); null when the caller may not use the dashboard */
 export async function ownedProjects(req: Request): Promise<string[] | null> {
   const c = await callerDb(req);

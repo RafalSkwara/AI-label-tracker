@@ -135,6 +135,8 @@ export type Data = {
   views24: Views24[];
   settings: Settings;
   runs: PipelineRun[];
+  /** Slowfall scene slugs already scheduled/public (video_jobs) */
+  published: string[];
 };
 
 export type Coll = "tasks" | "items" | "weeks" | "subs";
