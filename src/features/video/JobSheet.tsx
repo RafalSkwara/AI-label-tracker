@@ -109,7 +109,7 @@ export default function JobSheet({ job, onChange, onRemoved, onOpen, onClose, fl
             <FileRow label="Piosenka (MP3/WAV)" accept="audio/*,.mp3,.wav,.m4a,.flac" role="audio" job={job} onFile={onFile} onRemove={(a) => act("Usuwanie", "remove-asset", { key: a.key })} busy={!!busy} />
             {job.kind === "music_video"
               ? <FileRow label="Klipy (MP4, kolejność = kolejność cięć)" accept="video/*" role="clip" multiple job={job} onFile={onFile} onRemove={(a) => act("Usuwanie", "remove-asset", { key: a.key })} busy={!!busy} />
-              : <>
+              : <fieldset className={s.aiOff} disabled={!!params.ai}>
                 <FileRow label="Tło: obraz albo wideo (opcjonalnie)" accept="image/*,video/*" role="background" job={job} onFile={onFile} onRemove={(a) => act("Usuwanie", "remove-asset", { key: a.key })} busy={!!busy} />
                 <BgPreview job={job} />
                 <label className="field">Prompt tła (opcjonalnie, AI zrobi obraz)
@@ -123,7 +123,7 @@ export default function JobSheet({ job, onChange, onRemoved, onOpen, onClose, fl
                     <span className="sub">albo samo powstanie przy „Renderuj”</span>
                   </div>
                 )}
-              </>}
+              </fieldset>}
             {busy.startsWith("Wysyłanie") && <p className="sub">{busy}…</p>}
           </section>
         )}
@@ -146,6 +146,18 @@ export default function JobSheet({ job, onChange, onRemoved, onOpen, onClose, fl
         {cmv && (
           <section className={s.box}>
             <h2>Wygląd</h2>
+            {job.kind !== "music_video" && (
+              <label className="field check"><input type="checkbox" checked={!!params.ai} onChange={(e) => setP({ ai: e.target.checked })} />Pozwól AI zdecydować: Claude sam wymyśli klip pod tę piosenkę (bez szablonów, tła i instrukcji)</label>
+            )}
+            {params.ai && (
+              <div className={s.aiNote}>
+                {params.concept ? <p className="sub" style={{ margin: 0, whiteSpace: "pre-wrap" }}>Pomysł Claude: {params.concept}</p> : <p className="sub" style={{ margin: 0 }}>Claude przeczyta tekst i timingi, zaprojektuje jednorazowy klip, sprawdzi kadry i wyrenderuje. Projekt zostaje tylko przy tym zadaniu (i jego shortach), nie trafia do szablonów. Zużywa limit Twojej subskrypcji Claude.</p>}
+                {params.concept && (
+                  <label className="field check"><input type="checkbox" checked={!!params.redesign} onChange={(e) => setP({ redesign: e.target.checked })} />Przy następnym renderze wymyśl od nowa</label>
+                )}
+              </div>
+            )}
+            <fieldset className={s.aiOff} disabled={!!params.ai}>
             <div className={s.presets}>
               {Object.entries(PRESETS).map(([k, p]) => (
                 <button key={k} className={s.preset} aria-pressed={params.preset === k} onClick={() => setP({ preset: k, style: { ...presetStyle(k, job.kind), badge: style.badge } })}
@@ -166,6 +178,7 @@ export default function JobSheet({ job, onChange, onRemoved, onOpen, onClose, fl
             </div>
             {note && <p className="sub">{note}</p>}
             {more && <StyleFields style={style} set={setS} />}
+            </fieldset>
             {job.kind === "lyric" && (
               <label className="field check"><input type="checkbox" checked={(params.formats ?? ["16:9"]).includes("9:16")} onChange={(e) => setP({ formats: e.target.checked ? ["16:9", "9:16"] : ["16:9"] })} />Także wersja pionowa 9:16 (1080p)</label>
             )}
@@ -192,7 +205,7 @@ export default function JobSheet({ job, onChange, onRemoved, onOpen, onClose, fl
               <button className="btn primary" disabled={!!busy || missing.length > 0} onClick={() => act("Start", "render")}>
                 {cmv ? (files.length ? "Renderuj ponownie" : "Renderuj") : job.kind === "sf_shorts" ? "Zbuduj Shorty" : "Zbuduj film + 3 Shorty"}
               </button>
-              {cmv && <span className="sub">{job.kind === "short" ? "~5 min" : "16:9 w 4K: ~50 min"} na GitHub Actions</span>}
+              {cmv && <span className="sub">{job.kind === "short" ? "~5 min" : "16:9 w 4K: ~50 min"}{params.ai ? " + ~20 min projekt Claude" : ""} na GitHub Actions</span>}
             </div>
           )}
           {cmv && job.kind !== "short" && !active && (

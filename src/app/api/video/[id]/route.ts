@@ -45,7 +45,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         if (missing.length) return err(`brakuje: ${missing.map((m) => m.label).join(", ")}`);
         // optional background prompt: make the image now if none was uploaded or generated yet
         const bgPrompt = job.params.bg_prompt?.trim();
-        if (job.brand === "cmv" && job.kind !== "music_video" && bgPrompt && !job.assets.some((a) => a.role === "background")) {
+        if (job.brand === "cmv" && job.kind !== "music_video" && !job.params.ai && bgPrompt && !job.assets.some((a) => a.role === "background")) {
           try { await generateBackground(c.db, job, bgPrompt); } catch (e) { return err(`tło: ${(e as Error).message}`, 502); }
         }
         const prev = { status: job.status, stage: job.stage };
@@ -119,7 +119,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         const p = job.params;
         const { data: short, error } = await c.db.from("video_jobs").insert({
           brand: "cmv", kind: "short", project_id: (job as VideoJob & { project_id?: string }).project_id, title: `${p.song ?? job.title} · short`,
-          params: { song: p.song, artist: p.artist, lyrics: p.lyrics, preset: p.preset, instructions: p.instructions, style: p.style, segment: null },
+          params: { song: p.song, artist: p.artist, lyrics: p.lyrics, preset: p.preset, instructions: p.instructions, style: p.style, segment: null, ai: p.ai, concept: p.concept },
           meta: { ...job.meta, title: `${job.meta.title ?? p.song} #shorts`.slice(0, 100), publish_at: undefined },
         }).select("*").single<VideoJob>();
         if (error || !short) return err(error?.message ?? "insert failed", 500);
@@ -130,6 +130,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           const key = `jobs/${short.id}/in/${a.key.split("/").pop()}`;
           await b.put(key, await new Response(o.body).arrayBuffer(), { httpMetadata: o.httpMetadata });
           assets.push({ ...a, key });
+        }
+        // an AI design is reused by the short (one design per song)
+        for (const f of ["Custom.tsx", "concept.md"]) {
+          const o = p.ai ? await b.get(`jobs/${id}/work/${f}`) : null;
+          if (o) await b.put(`jobs/${short.id}/work/${f}`, await new Response(o.body).text(), { httpMetadata: o.httpMetadata });
         }
         let segment = null;
         const t = await b.get(`jobs/${id}/work/timing.json`);
