@@ -14,7 +14,7 @@ export type Privacy = "private" | "scheduled" | "public";
 export type Meta = { title?: string; description?: string; tags?: string[]; privacy?: Privacy; publish_at?: string; cleanup?: boolean };
 
 export type Style = {
-  layout: "stack" | "karaoke" | "kinetic" | "minimal" | "rating" | "breaking";
+  layout: "stack" | "karaoke" | "kinetic" | "minimal" | "rating";
   font: "inter" | "condensed" | "serif" | "mono" | "marker";
   textCase: "normal" | "upper" | "lower";
   fontScale: number;
@@ -69,7 +69,6 @@ export const PRESETS: Record<string, { label: string; style: Omit<Style, "badge"
   karaoke: { label: "Karaoke", style: { layout: "karaoke", font: "inter", textCase: "normal", fontScale: 1, textColor: "#ffffff", accent: "#ffd23f", bg1: "#1b1b2f", bg2: "#08080f", dim: 0.45, blur: 0, kenBurns: true, grain: 0.2, glow: 0.2, shake: 0, glitch: 0, intro: true, footer: true } },
   neon: { label: "Neon", style: { layout: "stack", font: "condensed", textCase: "upper", fontScale: 1.05, textColor: "#eafff4", accent: "#39ff88", bg1: "#2b0a3d", bg2: "#05010a", dim: 0.6, blur: 8, kenBurns: true, grain: 0.4, glow: 1, shake: 0.6, glitch: 0.35, intro: true, footer: true } },
   rated: { label: "Ocena (Rated)", style: { layout: "rating", font: "inter", textCase: "normal", fontScale: 1, textColor: "#f4f5f8", accent: "#ffc83d", bg1: "#1d1f27", bg2: "#08090c", dim: 0.6, blur: 0, kenBurns: false, grain: 0.35, glow: 0.5, shake: 0.6, glitch: 0.2, intro: false, footer: false } },
-  breaking: { label: "Wiadomości (Breaking)", style: { layout: "breaking", font: "inter", textCase: "normal", fontScale: 1, textColor: "#eef0f4", accent: "#ff2d2d", bg1: "#101522", bg2: "#030407", dim: 0.7, blur: 0, kenBurns: false, grain: 0.45, glow: 0.5, shake: 0.7, glitch: 0.5, intro: false, footer: false } },
   zine: { label: "Zin", style: { layout: "minimal", font: "serif", textCase: "normal", fontScale: 1, textColor: "#f3ead8", accent: "#e8b86d", bg1: "#2b2219", bg2: "#0d0a07", dim: 0.5, blur: 0, kenBurns: true, grain: 0.7, glow: 0, shake: 0, glitch: 0, intro: true, footer: false } },
 };
 
@@ -82,7 +81,7 @@ export function presetStyle(name: string, kind: Kind): Style {
   return { ...base, ...mv, badge: "", chorusSections: CHORUS };
 }
 
-export const LAYOUTS: Record<Style["layout"], string> = { stack: "Trzy linie (środek)", karaoke: "Karaoke (dół, wypełnianie)", kinetic: "Kinetyczny (słowo po słowie)", minimal: "Minimalny (jedna linia)", rating: "Aplikacja z ocenami (gwiazdki)", breaking: "Wiadomości (powiadomienia, pasek LIVE, pękający ekran)" };
+export const LAYOUTS: Record<Style["layout"], string> = { stack: "Trzy linie (środek)", karaoke: "Karaoke (dół, wypełnianie)", kinetic: "Kinetyczny (słowo po słowie)", minimal: "Minimalny (jedna linia)", rating: "Aplikacja z ocenami (gwiazdki)" };
 export const FONTS: Record<Style["font"], string> = { inter: "Inter", condensed: "Bebas (wąski)", serif: "Playfair (szeryf)", mono: "Mono", marker: "Marker (odręczny)" };
 
 const HEX = /^#[0-9a-f]{6}$/i;
@@ -95,7 +94,7 @@ export function cleanStyle(v: unknown, fallback: Style): Style {
   const col = (k: keyof Style) => (typeof o[k] === "string" && HEX.test(o[k] as string) ? (o[k] as string).toLowerCase() : (fallback[k] as string));
   const bool = (k: keyof Style) => (typeof o[k] === "boolean" ? (o[k] as boolean) : (fallback[k] as boolean));
   return {
-    layout: pick(o.layout, ["stack", "karaoke", "kinetic", "minimal", "rating", "breaking"] as const, fallback.layout),
+    layout: pick(o.layout, ["stack", "karaoke", "kinetic", "minimal", "rating"] as const, fallback.layout),
     font: pick(o.font, ["inter", "condensed", "serif", "mono", "marker"] as const, fallback.font),
     textCase: pick(o.textCase, ["normal", "upper", "lower"] as const, fallback.textCase),
     fontScale: num(o.fontScale, 0.6, 1.6, fallback.fontScale),
